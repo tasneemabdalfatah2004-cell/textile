@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Textile Smart System</title>
+
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Source+Sans+Pro:300,400,400i,700&display=fallback">
+    <link rel="stylesheet" href="{{ url_for('static', filename='plugins/fontawesome-free/css/all.min.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='dist/css/adminlte.min.css') }}">
+
+    <style>
+        .main-sidebar { background-color: #2c3e50 !important; }
+        .brand-link { border-bottom: 1px solid #4b545c !important; text-align: center; }
+        .nav-link.active { background-color: #3498db !important; }
+        .navbar-badge { top: 5px !important; right: 4px !important; }
+    </style>
+</head>
+
+<body class="hold-transition sidebar-mini layout-fixed">
+<div class="wrapper">
+
+    <nav class="main-header navbar navbar-expand navbar-white navbar-light">
+        <ul class="navbar-nav">
+            <li class="nav-item">
+                <a class="nav-link" data-widget="pushmenu" href="#" role="button"><i class="fas fa-bars"></i></a>
+            </li>
+            <li class="nav-item d-none d-sm-inline-block">
+                <a href="{{ url_for('main.dashboard') }}" class="nav-link">Home</a>
+            </li>
+        </ul>
+
+        <ul class="navbar-nav ml-auto">
+            <li class="nav-item dropdown">
+                <a class="nav-link" data-toggle="dropdown" href="#">
+                    <i class="far fa-bell"></i>
+                    {% if low_stock_count and low_stock_count > 0 %}
+                    <span class="badge badge-warning navbar-badge">{{ low_stock_count }}</span>
+                    {% endif %}
+                </a>
+                <div class="dropdown-menu dropdown-menu-lg dropdown-menu-right">
+                    <span class="dropdown-header text-bold">{{ low_stock_count or 0 }} Notifications</span>
+                    <div class="dropdown-divider"></div>
+                    
+                    {% if low_stock_products %}
+                        {% for item in low_stock_products %}
+                        <a href="{{ url_for('inventory.edit_product', id=item.id) }}" class="dropdown-item">
+                            <i class="fas fa-exclamation-triangle mr-2 text-danger"></i> 
+                            <span class="text-sm">{{ item.name }} is low ({{ item.quantity }})</span>
+                        </a>
+                        {% endfor %}
+                    {% else %}
+                        <p class="dropdown-item text-center text-muted text-sm p-3">No alerts at the moment</p>
+                    {% endif %}
+                    
+                    <div class="dropdown-divider"></div>
+                    <a href="{{ url_for('inventory.list_products') }}" class="dropdown-item dropdown-footer">See All Inventory</a>
+                </div>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" data-widget="fullscreen" href="#" role="button">
+                    <i class="fas fa-expand-arrows-alt"></i>
+                </a>
+            </li>
+        </ul>
+    </nav>
+
+    <aside class="main-sidebar sidebar-dark-primary elevation-4">
+        <a href="{{ url_for('main.dashboard') }}" class="brand-link">
+            <i class="fas fa-microchip mr-2"></i>
+            <span class="brand-text font-weight-bold">Textile System</span>
+        </a>
+
+        <div class="sidebar">
+            <nav class="mt-2">
+                <ul class="nav nav-pills nav-sidebar flex-column" data-widget="treeview" role="menu" data-accordion="false">
+                    
+                    <li class="nav-item">
+                        <a href="{{ url_for('main.dashboard') }}" class="nav-link {% if request.endpoint == 'main.dashboard' %}active{% endif %}">
+                            <i class="nav-icon fas fa-tachometer-alt"></i>
+                            <p>Dashboard</p>
+                        </a>
+                    </li>
+                    <li class="nav-header text-uppercase" style="font-size: 0.8rem; color: #bdc3c7;">Inventory Management</li>
+                    
+                    <li class="nav-item">
+                        <a href="{{ url_for('inventory.list_products') }}" class="nav-link {% if request.endpoint == 'inventory.list_products' %}active{% endif %}">
+                            <i class="nav-icon fas fa-boxes"></i>
+                            <p>Products List</p>
+                        </a>
+                    </li>
+
+                    <li class="nav-item">
+                        <a href="{{ url_for('inventory.add_product') }}" class="nav-link {% if request.endpoint == 'inventory.add_product' %}active{% endif %}">
+                            <i class="nav-icon fas fa-plus-circle"></i>
+                            <p>Add New Product</p>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="{{ url_for('inventory.sales_history') }}" class="nav-link {% if request.endpoint == 'inventory.sales_history' %}active{% endif %}">
+                           <i class="nav-icon fas fa-file-invoice-dollar"></i>
+                           <p>Sales History</p>
+                        </a>
+                    </li>
+
+                    <li class="nav-header text-uppercase" style="font-size: 0.8rem; color: #bdc3c7;">AI Analysis</li>
+                    
+                    <li class="nav-item">
+                        <a href="#" class="nav-link text-warning">
+                            <i class="nav-icon fas fa-brain"></i>
+                            <p>Smart Analysis <span class="badge badge-warning right">New</span></p>
+                        </a>
+                    </li>
+
+                    <li class="nav-item">
+                        <a href="#" class="nav-link">
+                            <i class="nav-icon fas fa-history"></i>
+                            <p>Analysis History</p>
+                        </a>
+                    </li>
+                </ul>
+            </nav>
+        </div>
+    </aside>
+
+    <div class="content-wrapper">
+        <section class="content pt-4">
+            <div class="container-fluid">
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                  {% if messages %}
+                    {% for category, message in messages %}
+                      <div class="alert alert-{{ category if category != 'error' else 'danger' }} alert-dismissible fade show">
+                        <button type="button" class="close" data-dismiss="alert">&times;</button>
+                        {{ message }}
+                      </div>
+                    {% endfor %}
+                  {% endif %}
+                {% endwith %}
+
+                {% block content %}{% endblock %}
+            </div>
+        </section>
+    </div>
+
+
+</div>
+
+<script src="{{ url_for('static', filename='plugins/jquery/jquery.min.js') }}"></script>
+<script src="{{ url_for('static', filename='plugins/bootstrap/js/bootstrap.bundle.min.js') }}"></script>
+<script src="{{ url_for('static', filename='dist/js/adminlte.min.js') }}"></script>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+</body>
+</html>

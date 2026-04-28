@@ -1,0 +1,140 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="content-header">
+    <div class="container-fluid">
+        <div class="row mb-2">
+            <div class="col-sm-6">
+                <h1 class="m-0 text-dark font-weight-bold">
+                    <i class="fas fa-file-invoice-dollar mr-2 text-success"></i> Sales History
+                </h1>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="card shadow">
+                <div class="card-header border-0 bg-white pt-4">
+                    <div class="row align-items-center">
+                        <div class="col-md-8">
+                            <h3 class="card-title text-bold text-muted">Recent Transactions</h3>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="input-group">
+                                <div class="input-group-prepend">
+                                    <span class="input-group-text bg-light border-right-0">
+                                        <i class="fas fa-search text-muted"></i>
+                                    </span>
+                                </div>
+                                <input type="text" id="salesSearch" class="form-control border-left-0 bg-light" 
+                                       placeholder="Search by customer or fabric...">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle mb-0" id="salesTable">
+                            <thead class="thead-light">
+                                <tr>
+                                    <th class="pl-4">Invoice ID</th>
+                                    <th>Date</th>
+                                    <th>Fabric Item</th>
+                                    <th>Quantity</th>
+                                    <th>Total Amount</th>
+                                    <th>Customer Name</th>
+                                    <th class="text-center">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for sale in sales %}
+                                <tr>
+                                    <td class="pl-4">
+                                        <span class="badge badge-secondary py-2 px-3">#INV-{{ sale.id }}</span>
+                                    </td>
+                                    <td class="text-muted small">
+                                        {{ sale.date_sold.strftime('%Y-%m-%d | %H:%M') }}
+                                    </td>
+                                    <td>
+                                        <div class="d-flex align-items-center">
+                                            <span class="text-bold text-primary">{{ sale.product.name }}</span>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <span class="text-dark">{{ sale.quantity_sold }} Units</span>
+                                    </td>
+                                    <td>
+                                        <span class="text-success text-bold">${{ "{:,.2f}".format(sale.total_price) }}</span>
+                                    </td>
+                                    <td>
+                                        <a href="{{ url_for('inventory.customer_details', name=sale.customer_name) if sale.customer_name else '#' }}" 
+                                           class="text-info font-weight-bold">
+                                            <i class="fas fa-user-circle mr-1"></i>
+                                            {{ sale.customer_name or 'General Customer' }}
+                                        </a>
+                                        </td>
+                                    <td class="text-center">
+                                        <button class="btn btn-sm btn-outline-dark mx-1" title="Print Invoice">
+                                            <i class="fas fa-print"></i>
+                                        </button>
+                                        <button class="btn btn-sm btn-outline-info mx-1" title="View Details">
+                                            <i class="fas fa-eye"></i>
+                                        </button>
+                                    </td>
+                                </tr>
+                                {% else %}
+                                <tr>
+                                    <td colspan="7" class="text-center py-5 text-muted">
+                                        <i class="fas fa-shopping-cart fa-3x mb-3 opacity-50"></i>
+                                        <h5>No sales recorded yet.</h5>
+                                        <p>Start selling from the Product List to see records here.</p>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                
+                <div class="card-footer bg-white text-right">
+                    <span class="text-muted mr-3">Total Sales Records: <strong>{{ sales|length }}</strong></span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.getElementById('salesSearch').addEventListener('keyup', function() {
+    let filter = this.value.toLowerCase();
+    let rows = document.querySelectorAll('#salesTable tbody tr');
+    
+    rows.forEach(row => {
+        // البحث في كامل النص داخل الصف
+        let text = row.innerText.toLowerCase();
+        if (text.includes(filter)) {
+            row.style.display = '';
+        } else {
+            row.style.display = 'none';
+        }
+    });
+});
+</script>
+
+<style>
+    /* لمسات جمالية إضافية */
+    #salesTable thead th {
+        text-transform: uppercase;
+        font-size: 0.85rem;
+        letter-spacing: 1px;
+        border-top: none;
+    }
+    .table td { vertical-align: middle !important; }
+    .card { border-radius: 15px; overflow: hidden; }
+    .badge { border-radius: 8px; }
+</style>
+{% endblock %}

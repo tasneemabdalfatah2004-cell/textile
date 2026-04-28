@@ -1,0 +1,117 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="content-header">
+    <div class="container-fluid">
+        <h1 class="m-0 text-dark font-weight-bold">System Dashboard</h1>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-lg-3 col-6">
+        <div class="small-box bg-info shadow">
+            <div class="inner">
+                <h3>{{ products|length }}</h3>
+                <p>Total Fabric Types</p>
+            </div>
+            <div class="icon"><i class="fas fa-scroll"></i></div>
+            <a href="{{ url_for('inventory.list_products') }}" class="small-box-footer">
+                View Inventory <i class="fas fa-arrow-circle-right"></i>
+            </a>
+        </div>
+    </div>
+
+    <div class="col-lg-3 col-6">
+        <div class="small-box bg-success shadow">
+            <div class="inner">
+                <h3>{{ total_sales_count }}</h3>
+                <p>Total Sales Operations</p>
+            </div>
+            <div class="icon"><i class="fas fa-shopping-cart"></i></div>
+            <a href="{{ url_for('inventory.sales_history') }}" class="small-box-footer">
+                Sales History <i class="fas fa-arrow-circle-right"></i>
+            </a>
+        </div>
+    </div>
+
+    <div class="col-lg-3 col-6">
+        <div class="small-box bg-warning shadow">
+            <div class="inner">
+                <h3>{{ low_stock_count }}</h3>
+                <p>Low Stock Alerts</p>
+            </div>
+            <div class="icon"><i class="fas fa-exclamation-triangle text-white"></i></div>
+            <a href="{{ url_for('inventory.list_products', filter='low') }}" class="small-box-footer">
+                Review Alerts <i class="fas fa-arrow-circle-right"></i>
+            </a>
+        </div>
+    </div>
+
+    <div class="col-lg-3 col-6">
+        <div class="small-box bg-danger shadow">
+            <div class="inner">
+                <h3>${{ "{:,.2f}".format(total_profit) }}</h3>
+                <p>Total Revenue</p>
+            </div>
+            <div class="icon"><i class="fas fa-chart-line"></i></div>
+            <a href="{{ url_for('main.analytics') }}" class="small-box-footer">
+                View Analytics <i class="fas fa-chart-pie"></i>
+            </a>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col-md-8">
+        <div class="card card-outline card-success shadow">
+            <div class="card-header bg-white border-0">
+                <h3 class="card-title text-bold"><i class="fas fa-history mr-2"></i>Recent Transactions</h3>
+            </div>
+            <div class="card-body p-0">
+                <table class="table table-striped">
+                    <thead>
+                        <tr>
+                            <th>Fabric</th>
+                            <th>Customer</th>
+                            <th>Total</th>
+                            <th>Time</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for sale in recent_sales %}
+                        <tr>
+                            <td>{{ sale.product.name }}</td>
+                            <td>{{ sale.customer_name or 'Walk-in' }}</td>
+                            <td class="text-success font-weight-bold">${{ "{:,.2f}".format(sale.total_price) }}</td>
+                            <td>{{ sale.date_sold.strftime('%H:%M') }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-4">
+        <div class="card shadow">
+            <div class="card-header bg-dark">
+                <h3 class="card-title">Critical Alerts</h3>
+            </div>
+            <div class="card-body p-0">
+                <ul class="list-group list-group-flush">
+                    {% if low_stock_products %}
+                        {% for item in low_stock_products %}
+                        <li class="list-group-item">
+                            <span class="text-danger font-weight-bold">{{ item.name }}</span>
+                            <span class="badge badge-danger float-right">Only {{ item.quantity }} left</span>
+                        </li>
+                        {% endfor %}
+                    {% else %}
+                        <li class="list-group-item text-center text-muted py-4">Stock is healthy</li>
+                    {% endif %}
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
