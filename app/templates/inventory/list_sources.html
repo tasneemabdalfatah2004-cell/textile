@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-5" dir="ltr">
+    <div class="row justify-content-center">
+        <div class="col-md-11 mb-5">
+            <div class="card shadow-lg border-0" style="border-radius: 15px;">
+                <div class="card-header bg-dark text-white p-4" style="border-radius: 15px 15px 0 0;">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h3 class="card-title mb-0 font-weight-bold">
+                                <i class="fas fa-handshake text-success me-2"></i> Partners & Suppliers Ledger
+                            </h3>
+                            <p class="mb-0 text-muted small mt-1">Track partner purchases, baseline wholesale metrics, and incoming bulk cloth balances</p>
+                        </div>
+                        <span class="badge bg-success p-2 fs-6">Active Sources</span>
+                    </div>
+                </div>
+                
+                <div class="card-body p-4 bg-light">
+                    <div class="table-responsive border rounded shadow-sm bg-white">
+                        <table class="table table-hover align-middle mb-0 text-center">
+                            <thead class="table-dark text-uppercase small">
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Partner / Supplier</th>
+                                    <th>Fabric Item</th>
+                                    <th>Supplied Qty</th>
+                                    <th>Wholesale Price / M</th>
+                                    <th>Total Investment</th>
+                                    <th>Notes</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for log in supplies %}
+                                <tr>
+                                    <td class="text-secondary small">{{ log.purchase_date.strftime('%Y-%m-%d %H:%M') }}</td>
+                                    <td class="font-weight-bold text-dark">
+                                        <i class="fas fa-building text-secondary me-1"></i> {{ log.partner_name }}
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-secondary p-2">{{ log.product.name }}</span>
+                                    </td>
+                                    <td class="font-weight-bold text-primary">{{ log.supplied_quantity }} m</td>
+                                    <td class="text-danger font-weight-bold">${{ "%.2f"|format(log.cost_price_at_purchase) }}</td>
+                                    <td class="text-success font-weight-bold">
+                                        ${{ "%.2f"|format(log.supplied_quantity * log.cost_price_at_purchase) }}
+                                    </td>
+                                    <td>
+                                        <small class="text-muted">{{ log.notes or '-' }}</small>
+                                    </td>
+                                </tr>
+                                {% else %}
+                                <tr>
+                                    <td colspan="7" class="text-muted p-5">
+                                        <i class="fas fa-folder-open fa-3x d-block mb-3 text-secondary"></i>
+                                        No partner registry logs committed to the ledger yet.
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

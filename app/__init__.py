@@ -1,29 +1,42 @@
+import os
 from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
-from config import Config
+from flask_login import LoginManager
 
 db = SQLAlchemy()
+login_manager = LoginManager()
 
 def create_app():
-    # يجب أن تكون name
+    
     app = Flask(__name__)
-    app.config.from_object(Config)
+
+    # إعدادات التطبيق
+    app.config['SECRET_KEY'] = 'my_secret_key_12345'
+    app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///site.db'
+    app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+
+    # تهيئة الإضافات
     db.init_app(app)
+    login_manager.init_app(app)
 
-    # تسجيل البلوبرنت الخاص بالمخزن
+    # صفحة تسجيل الدخول
+    login_manager.login_view = 'auth.login'
+    login_manager.login_message_category = 'info'
+
+    # 🌟 هذا السطر السحري يحل خطأ الـ UndefinedError في Jinja2 نهائياً عند دخول صفحة المدير
+    app.jinja_env.globals.update(hasattr=hasattr)
+
+    # استيراد وتسجيل الـ Blueprints
+    from app.auth.routes import auth_bp
     from app.inventory.routes import inventory_bp
-    app.register_blueprint(inventory_bp, url_prefix="/inventory")
-
-    # تسجيل البلوبرنت الخاص بالـ Dashboard (هو الذي سيمسك الصفحة الرئيسية)
     from app.main.routes import main_bp
+
+    app.register_blueprint(auth_bp)
+    app.register_blueprint(inventory_bp)
     app.register_blueprint(main_bp)
 
-    # إضافة ميزة التنبيهات لكل الموقع
-    @app.context_processor
-    def inject_alerts():
-        from app.models import Product
-        low_stock = Product.query.filter(Product.quantity < 5).all()
-        return dict(low_stock_products=low_stock, low_stock_count=len(low_stock))
+    # إنشاء الجداول
+    with app.app_context():
+        db.create_all()
 
     return app
-    

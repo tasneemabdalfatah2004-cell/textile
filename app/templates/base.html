@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Textile Smart System</title>
+    <title>Smart Textile System</title>
 
     <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Source+Sans+Pro:300,400,400i,700&display=fallback">
     <link rel="stylesheet" href="{{ url_for('static', filename='plugins/fontawesome-free/css/all.min.css') }}">
@@ -13,115 +13,112 @@
         .main-sidebar { background-color: #2c3e50 !important; }
         .brand-link { border-bottom: 1px solid #4b545c !important; text-align: center; }
         .nav-link.active { background-color: #3498db !important; }
-        .navbar-badge { top: 5px !important; right: 4px !important; }
+        /* تحسين شكل الهيدر للزبون */
+        {% if not current_user.is_authenticated %}
+        .main-header { margin-left: 0 !important; }
+        .content-wrapper { margin-left: 0 !important; }
+        {% endif %}
     </style>
 </head>
 
-<body class="hold-transition sidebar-mini layout-fixed">
+<body class="hold-transition {% if current_user.is_authenticated %}sidebar-mini{% else %}layout-top-nav{% endif %} layout-fixed">
 <div class="wrapper">
 
-    <nav class="main-header navbar navbar-expand navbar-white navbar-light">
+    <nav class="main-header navbar navbar-expand navbar-white navbar-light shadow-sm">
         <ul class="navbar-nav">
+            {% if current_user.is_authenticated %}
             <li class="nav-item">
                 <a class="nav-link" data-widget="pushmenu" href="#" role="button"><i class="fas fa-bars"></i></a>
             </li>
-            <li class="nav-item d-none d-sm-inline-block">
-                <a href="{{ url_for('main.dashboard') }}" class="nav-link">Home</a>
-            </li>
-        </ul>
-
-        <ul class="navbar-nav ml-auto">
-            <li class="nav-item dropdown">
-                <a class="nav-link" data-toggle="dropdown" href="#">
-                    <i class="far fa-bell"></i>
-                    {% if low_stock_count and low_stock_count > 0 %}
-                    <span class="badge badge-warning navbar-badge">{{ low_stock_count }}</span>
-                    {% endif %}
-                </a>
-                <div class="dropdown-menu dropdown-menu-lg dropdown-menu-right">
-                    <span class="dropdown-header text-bold">{{ low_stock_count or 0 }} Notifications</span>
-                    <div class="dropdown-divider"></div>
-                    
-                    {% if low_stock_products %}
-                        {% for item in low_stock_products %}
-                        <a href="{{ url_for('inventory.edit_product', id=item.id) }}" class="dropdown-item">
-                            <i class="fas fa-exclamation-triangle mr-2 text-danger"></i> 
-                            <span class="text-sm">{{ item.name }} is low ({{ item.quantity }})</span>
-                        </a>
-                        {% endfor %}
-                    {% else %}
-                        <p class="dropdown-item text-center text-muted text-sm p-3">No alerts at the moment</p>
-                    {% endif %}
-                    
-                    <div class="dropdown-divider"></div>
-                    <a href="{{ url_for('inventory.list_products') }}" class="dropdown-item dropdown-footer">See All Inventory</a>
-                </div>
-            </li>
+            {% endif %}
             <li class="nav-item">
-                <a class="nav-link" data-widget="fullscreen" href="#" role="button">
-                    <i class="fas fa-expand-arrows-alt"></i>
+                <a href="{{ url_for('inventory.customer_shop') }}" class="nav-link text-bold">
+                    <i class="fas fa-store mr-1 text-success"></i> Fabric Store
                 </a>
             </li>
         </ul>
+       
+        <ul class="navbar-nav ml-auto align-items-center">
+            {% if not current_user.is_authenticated %}
+    <li class="nav-item">
+        <button type="button" class="btn btn-outline-success position-relative " data-toggle="modal" data-target="#cartModal">
+            <i class="fas fa-shopping-cart"></i>
+            <span id="cart-count"class="badge badge-danger position-absolute" style="top:0; right:0;">
+                {{ session['cart']|length if session.get('cart') else 0 }}
+            </span>
+        </button>
+    </li>
+    {%endif%}
+
+    {% if current_user.is_authenticated %}
+        <li class="nav-item d-none d-sm-inline-block">
+            
+        </li>
+        <li class="nav-item">
+            <a href="{{ url_for('auth.logout') }}" class="nav-link text-danger"><i class="fas fa-sign-out-alt"></i> Logout</a>
+        </li>
+    {% else %}
+        <li class="nav-item">
+            <a href="{{ url_for('auth.login') }}" class="nav-link btn btn-outline-primary btn-sm px-3 mx-2">Admin Login</a>
+        </li>
+    {% endif %}
+ </ul>
     </nav>
 
+    {% if current_user.is_authenticated %}
     <aside class="main-sidebar sidebar-dark-primary elevation-4">
-        <a href="{{ url_for('main.dashboard') }}" class="brand-link">
-            <i class="fas fa-microchip mr-2"></i>
-            <span class="brand-text font-weight-bold">Textile System</span>
+        <a href="#" class="brand-link">
+            <i class="fas fa-microchip mr-2 text-info"></i>
+            <span class="brand-text font-weight-light">Smart Textile AI</span>
         </a>
 
         <div class="sidebar">
-            <nav class="mt-2">
-                <ul class="nav nav-pills nav-sidebar flex-column" data-widget="treeview" role="menu" data-accordion="false">
-                    
+            <nav class="mt-3">
+                <ul class="nav nav-pills nav-sidebar flex-column" data-widget="treeview" role="menu">
+                    <li class="nav-header text-uppercase" style="color: #bdc3c7;">Management</li>
                     <li class="nav-item">
                         <a href="{{ url_for('main.dashboard') }}" class="nav-link {% if request.endpoint == 'main.dashboard' %}active{% endif %}">
                             <i class="nav-icon fas fa-tachometer-alt"></i>
                             <p>Dashboard</p>
                         </a>
                     </li>
-                    <li class="nav-header text-uppercase" style="font-size: 0.8rem; color: #bdc3c7;">Inventory Management</li>
-                    
                     <li class="nav-item">
                         <a href="{{ url_for('inventory.list_products') }}" class="nav-link {% if request.endpoint == 'inventory.list_products' %}active{% endif %}">
                             <i class="nav-icon fas fa-boxes"></i>
-                            <p>Products List</p>
+                            <p>Inventory Control</p>
                         </a>
                     </li>
-
                     <li class="nav-item">
                         <a href="{{ url_for('inventory.add_product') }}" class="nav-link {% if request.endpoint == 'inventory.add_product' %}active{% endif %}">
                             <i class="nav-icon fas fa-plus-circle"></i>
-                            <p>Add New Product</p>
+                            <p>Add Shipment</p>
                         </a>
                     </li>
                     <li class="nav-item">
                         <a href="{{ url_for('inventory.sales_history') }}" class="nav-link {% if request.endpoint == 'inventory.sales_history' %}active{% endif %}">
-                           <i class="nav-icon fas fa-file-invoice-dollar"></i>
-                           <p>Sales History</p>
+                           <i class="nav-icon fas fa-history"></i>
+                           <p>Sales Logs</p>
                         </a>
                     </li>
-
-                    <li class="nav-header text-uppercase" style="font-size: 0.8rem; color: #bdc3c7;">AI Analysis</li>
-                    
                     <li class="nav-item">
-                        <a href="#" class="nav-link text-warning">
-                            <i class="nav-icon fas fa-brain"></i>
-                            <p>Smart Analysis <span class="badge badge-warning right">New</span></p>
-                        </a>
+                        <a href="{{ url_for('inventory.list_sources') }}" class="nav-link text-white py-3 px-4 d-flex align-items-center">
+                             <i class="fas fa-handshake me-3 text-success"></i>
+                             <p>المصادر والشركاء</p>
+                       </a>
                     </li>
 
+                    <li class="nav-header text-uppercase" style="color: #bdc3c7;">AI Engine</li>
                     <li class="nav-item">
                         <a href="#" class="nav-link">
-                            <i class="nav-icon fas fa-history"></i>
-                            <p>Analysis History</p>
+                            <i class="nav-icon fas fa-brain text-warning"></i>
+                            <p>Texture Analysis</p>
                         </a>
                     </li>
                 </ul>
             </nav>
         </div>
     </aside>
+    {% endif %}
 
     <div class="content-wrapper">
         <section class="content pt-4">
@@ -129,7 +126,7 @@
                 {% with messages = get_flashed_messages(with_categories=true) %}
                   {% if messages %}
                     {% for category, message in messages %}
-                      <div class="alert alert-{{ category if category != 'error' else 'danger' }} alert-dismissible fade show">
+                      <div class="alert alert-{{ category if category != 'error' else 'danger' }} alert-dismissible fade show shadow-sm">
                         <button type="button" class="close" data-dismiss="alert">&times;</button>
                         {{ message }}
                       </div>
@@ -141,13 +138,35 @@
             </div>
         </section>
     </div>
-
-
+    
 </div>
-
 <script src="{{ url_for('static', filename='plugins/jquery/jquery.min.js') }}"></script>
 <script src="{{ url_for('static', filename='plugins/bootstrap/js/bootstrap.bundle.min.js') }}"></script>
 <script src="{{ url_for('static', filename='dist/js/adminlte.min.js') }}"></script>
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+<script>
+$(document).ready(function() {
+    // تشغيل المودال إذا كان الرابط يحتوي على الإشارة
+    if(window.location.search.includes('cart_open')) {
+        $('#cartModal').modal('show');
+    }
+
+    // بدلاً من data-bs-toggle، استخدم هذا الكود الموحد لأي زر يفتح مودال
+    $('.open-modal-btn').click(function() {
+        var target = $(this).data('target');
+        $(target).modal('show');
+    });
+
+    // كود البحث
+    $('#fabricSearch').on('keyup', function() {
+        var value = $(this).val().toLowerCase().trim();
+        $('.fabric-item').each(function() {
+            var productName = $(this).find('h4').text().toLowerCase().trim();
+            $(this).toggle(productName.includes(value));
+        });
+    });
+});
+</script>
 </body>
 </html>

@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="content-header">
+    <div class="container-fluid">
+        <h1 class="m-0"><i class="fas fa-chart-pie mr-2 text-primary"></i>تحليلات النظام الذكية</h1>
+    </div>
+</div>
+
+<div class="row p-3">
+    <div class="col-md-8">
+        <div class="card shadow border-left-primary">
+            <div class="card-header bg-white">
+                <h3 class="card-title text-primary font-weight-bold">نمو الأرباح اليومي</h3>
+            </div>
+            <div class="card-body">
+                <canvas id="profitLineChart" style="min-height: 350px;"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-4">
+        <div class="card shadow border-left-success">
+            <div class="card-header bg-white">
+                <h3 class="card-title text-success font-weight-bold">توزيع الأقمشة المباعة</h3>
+            </div>
+            <div class="card-body">
+                <canvas id="fabricPieChart" style="min-height: 350px;"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<script>
+    // 1. رسم منحنى الأرباح (Line Chart)
+    const ctxLine = document.getElementById('profitLineChart').getContext('2d');
+    new Chart(ctxLine, {
+        type: 'line',
+        data: {
+            labels: {{ profit_labels|tojson }},
+            datasets: [{
+                label: 'صافي الربح ($)',
+                data: {{ profit_values|tojson }},
+                borderColor: '#4e73df',
+                backgroundColor: 'rgba(78, 115, 223, 0.05)',
+                fill: true,
+                tension: 0.3
+            }]
+        },
+        options: { responsive: true, maintainAspectRatio: false }
+    });
+
+    // 2. رسم المخطط الدائري (Pie Chart)
+    const ctxPie = document.getElementById('fabricPieChart').getContext('2d');
+    new Chart(ctxPie, {
+        type: 'pie',
+        data: {
+            labels: {{ pie_labels|tojson }},
+            datasets: [{
+                data: {{ pie_values|tojson }},
+                backgroundColor: ['#1cc88a', '#f6c23e', '#e74a3b', '#36b9cc', '#4e73df']
+            }]
+        },
+        options: { responsive: true, maintainAspectRatio: false }
+    });
+</script>
+{% endblock %}

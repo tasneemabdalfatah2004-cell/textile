@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container mt-4">
+    <h2 class="text-success"><i class="fas fa-clock"></i> Pending Orders</h2>
+    <table class="table table-bordered mt-3">
+        <thead class="table-light">
+            <tr>
+                <th>Customer</th>
+                <th>Fabric</th>
+                <th>Quantity</th>
+                <th>Action</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in pending_items %}
+            <tr>
+                <td>{{ item.order.customer.name }}</td>
+                <td>{{ item.variant.product.name }}</td>
+                <td>{{ item.quantity_ordered }} m</td>
+                <td>
+                    <form method="POST" action="{{ url_for('inventory.approve_order', order_id=item.order.id) }}">
+                        <button class="btn btn-sm btn-success">Approve</button>
+                    </form>
+                </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="4" class="text-center">No pending orders</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

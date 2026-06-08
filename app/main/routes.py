@@ -1,45 +1,56 @@
-from flask import render_template, Blueprint, request
-from app.models import Product, Sale
-from app import db
+from flask import render_template, Blueprint, flash, redirect, url_for
+from flask_login import login_required
 from sqlalchemy import func
+from datetime import datetime, timedelta
 
-# تأكدي أن هذا الاسم هو المستخدم في ملف init.py لتجنب أخطاء الـ Import
+from app import db
+from app.models import Product, ProductVariant, Order, OrderItem
+
 main_bp = Blueprint('main', __name__)
+
 
 @main_bp.route('/')
 @main_bp.route('/dashboard')
+@login_required
 def dashboard():
-    # جلب إحصائيات المنتجات والمخزن
-    products = Product.query.all()
-    low_stock_products = Product.query.filter(Product.quantity < 5).all()
-    low_stock_count = len(low_stock_products)
+    try:
+        # 1. بيانات المخزون (أساسية للمدير)
+        products = Product.query.all()
+        low_stock_variants = ProductVariant.query.filter(ProductVariant.quantity <= 10).all()
+        low_stock_count = len(low_stock_variants)
 
-    # حساب إجمالي المبيعات (المربع الأحمر)
-    total_revenue = db.session.query(func.sum(Sale.total_price)).scalar() or 0
-    
-    # عدد العمليات (المربع الأخضر)
-    total_sales_count = Sale.query.count()
-    
-    # آخر 5 عمليات للجدول
-    recent_sales = Sale.query.order_by(Sale.date_sold.desc()).limit(5).all()
+        # 2. البيانات المالية (مبسطة)
+        total_revenue = db.session.query(
+            func.sum(OrderItem.price_per_unit * OrderItem.quantity_ordered)
+        ).select_from(OrderItem).join(Order).filter(Order.status == 'approved').scalar() or 0
 
-    return render_template('dashboard.html', 
-                           products=products, 
-                           low_stock_products=low_stock_products, 
-                           low_stock_count=low_stock_count,
-                           total_profit=total_revenue,
-                           total_sales_count=total_sales_count,
-                           recent_sales=recent_sales)
+        # 3. الطلبات المعلقة (أهم شيء للمدير يومياً)
+        pending_orders = db.session.query(OrderItem)\
+            .select_from(OrderItem)\
+            .join(Order, OrderItem.order_id == Order.id)\
+            .filter(Order.status == 'pending')\
+            .all()
 
-@main_bp.route('/analytics')
-def analytics():
-    # تجهيز بيانات الرسم البياني: اسم القماش وإجمالي مبيعاته
-    chart_data = db.session.query(
-        Product.name, 
-        func.sum(Sale.total_price).label('total')
-    ).join(Sale).group_by(Product.name).all()
+        # 4. المبيعات الأخيرة (لإعطاء حركة للوحة)
+        recent_sales = db.session.query(OrderItem)\
+            .select_from(OrderItem)\
+            .join(Order, OrderItem.order_id == Order.id)\
+            .filter(Order.status == 'approved')\
+            .order_by(Order.date_ordered.desc())\
+            .limit(5)\
+            .all()
 
-    labels = [row[0] for row in chart_data]
-    values = [float(row[1]) for row in chart_data]
+        return render_template(
+            'dashboard.html',
+            products=products,
+            low_stock_variants=low_stock_variants,
+            low_stock_count=low_stock_count,
+            total_profit=total_revenue,
+            pending_orders=pending_orders,
+            recent_sales=recent_sales
+        )
 
-    return render_template('analytics.html', labels=labels, values=values)
+    except Exception as e:
+        print(f"Error: {e}")
+        flash("حدث خطأ أثناء تحميل لوحة التحكم.", "danger")
+        return render_template('dashboard.html', low_stock_count=0, pending_orders=[], recent_sales=[])

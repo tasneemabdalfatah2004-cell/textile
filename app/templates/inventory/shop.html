@@ -1,0 +1,327 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="container mt-5" dir="ltr">
+    <div class="text-center my-5">
+        <h1 class="display-4 font-weight-bold"><i class="fas fa-store text-success"></i> Smart Fabric Store</h1>
+        <p class="text-muted">Browse our premium textile collection and order directly from the factory</p>
+    </div>
+    <div class="row justify-content-center mb-4">
+    <div class="col-md-6">
+        <input type="text" id="fabricSearch" class="form-control rounded-pill shadow-sm" placeholder="🔍 Search for a fabric name...">
+    </div>
+   </div>
+    <div class="row" id="fabric-grid">
+        {% for product in products %}
+        <div class="col-md-4 mb-4 fabric-item" >
+            <div class="card h-100 shadow-sm border-0" style="border-radius: 12px; overflow: hidden;">
+                <img src="{{ url_for('static', filename='uploads/' + product.image_file) }}" class="card-img-top" style="height: 240px; object-fit: cover; margin:4px; " alt="{{ product.name }}">
+                <div class="card-body text-center">
+                    <h4 class="font-weight-bold mb-2">{{ product.name }}</h4>
+                    {% if product.description %}
+                   <p class="text-muted small mb-2">
+                    {{ product.description }}
+                    </p>
+                    {% else %}
+                    <p>
+
+                    </p>
+                    {% endif %}
+                    <div class="mb-3">
+      <div class="d-flex justify-content-center gap-2 flex-wrap mt-2">
+
+        {% for variant in product.variants %}
+
+            {% if variant.image_filename %}
+
+            <img
+                src="{{ url_for('static', filename='uploads/' + variant.image_filename) }}"
+                class="pattern-circle"
+                width="50"
+                height="50"
+                title="{{ variant.color_name }}"
+                style="
+                    border-radius:50%;
+                    object-fit:cover;
+                    border:3px solid #dee2e6;
+                    cursor:pointer;
+                    transition:0.2s;
+                "
+                onclick="handleColorSelection(this)"
+                data-variant-id="{{ variant.id }}"
+                data-variant-name="{{ variant.color_name }}"
+            >
+
+            {% else %}
+
+            <div
+                class="color-circle"
+                style="
+                    width:50px;
+                    height:50px;
+                    border-radius:50%;
+                    background:#f8f9fa;
+                    border:3px solid #dee2e6;
+                    display:flex;
+                    align-items:center;
+                    justify-content:center;
+                    font-size:12px;
+                "
+            >
+                ?
+            </div>
+
+            {% endif %}
+
+        {% endfor %}
+  
+                            </div>
+                </div>
+                    <button class="btn btn-outline-success w-100 rounded-pill" onclick="openOrderModal('{{ product.id }}', '{{ product.name }}')">
+                        <i class="fas fa-cart-plus"></i> Add To Cart
+                    </button>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+     </div>
+</div>
+
+<div class="modal fade" id="cartModal" tabindex="-1" role="dialog" aria-hidden="true">
+    <div class="modal-dialog modal-lg" role="document">
+        <div class="modal-content" style="border-radius: 15px;">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title"><i class="fas fa-shopping-cart"></i> Your Active Cart</h5>
+                <button type="button" class="close text-white" data-dismiss="modal">&times;</button>
+            </div>
+            <div class="modal-body p-4">
+                {% if session.get('cart') %}
+                <table class="table align-middle text-center">
+                    <thead><tr><th>Fabric</th><th>Meters</th><th>Action</th></tr></thead>
+                    <tbody>
+                        {% for variant_id, qty in session.get('cart', {}).items() %}
+                        <tr>
+                            <td>{{ session.get('variant_info_' + variant_id|string, 'Fabric Item') }}</td>
+                            <td class="font-weight-bold">{{ qty }}m</td>
+                            <td>
+                                <button type="button" class="btn btn-sm btn-outline-danger rounded-pill" onclick="removeItem('{{ variant_id }}')">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                <form action="{{ url_for('inventory.cart_checkout') }}" method="POST" class="border-top pt-3">
+                    <input type="text" name="customer_name" class="form-control mb-3" placeholder="Enter Full Name To Confirm" required>
+                    <button type="submit" class="btn btn-success w-100 rounded-pill">Complete Order</button>
+                </form>
+                {% else %}
+                <p class="text-center text-muted">Your cart is currently empty.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="orderModal" tabindex="-1" role="dialog">
+    <div class="modal-dialog modal-dialog-centered" role="document">
+        <div class="modal-content">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title" id="modal-product-name">Add to Cart</h5>
+                <button type="button" class="close text-white" data-dismiss="modal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="hidden-variant-id">
+                <div class="mb-3">
+                    <label class="form-label">Color Profile</label>
+                    <input type="text" id="display-color-name" class="form-control bg-light" readonly>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Quantity (Meters)</label>
+                    <input type="number" id="v-qty" step="0.1" class="form-control" required>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-success w-100" onclick="addToCartAjax()">Add To Active Session</button>
+            </div>
+        </div>
+    </div>
+</div>
+<script>
+function handleColorSelection(el){
+
+    $('.pattern-circle').css(
+        'border-color',
+        '#dee2e6'
+    );
+
+    $(el).css(
+        'border-color',
+        '#28a745'
+    );
+
+    $('#hidden-variant-id').val(
+        $(el).data('variant-id')
+    );
+
+    $('#display-color-name').val(
+        $(el).data('variant-name')
+    );
+}
+
+function openOrderModal(productId, productName){
+
+    const variantId =
+        $('#hidden-variant-id').val();
+
+    if(!variantId){
+
+        Swal.fire(
+            'Warning',
+            'Please select a pattern first',
+            'warning'
+        );
+
+        return;
+    }
+
+    $('#modal-product-name').text(
+        'Adding: ' + productName
+    );
+
+    $('#orderModal').modal('show');
+}
+
+function addToCartAjax(){
+    const vId = $('#hidden-variant-id').val();
+    const qty = $('#v-qty').val();
+
+    // تصحيح منطق التحقق (استخدام || بدلاً من المسافة)
+    if(!vId || !qty){
+        Swal.fire(
+            'Error',
+            'Select pattern and quantity',
+            'error'
+        );
+        return;
+    }
+
+    $.ajax({
+        url:'/cart/add',
+        method:'POST',
+        data:{
+            variant_id: vId,
+            quantity: qty
+        },
+        success:function(response){
+            $('#orderModal').modal('hide');
+            $('#v-qty').val('');
+
+            // رسالة نجاح مع إعادة تحميل الصفحة لتحديث الـ HTML
+            Swal.fire({
+                title: 'Success',
+                text: 'Added to cart',
+                icon: 'success',
+                timer: 1500,
+                showConfirmButton: false
+            }).then(() => {
+                // إعادة تحميل الصفحة ضروري هنا لأن المودال يعتمد على محتوى القالب (Jinja2)
+                location.reload(); 
+            });
+        },
+        error:function(xhr){
+            let errorMessage = "Something went wrong";
+            if (xhr.responseJSON && xhr.responseJSON.message) {
+                errorMessage = xhr.responseJSON.message;
+            }
+            Swal.fire(
+                'Error',
+                errorMessage,
+                'error'
+            );
+        }
+    });
+}
+function removeItem(variantId) {
+    $.post('/cart/remove/' + variantId, function() {
+        // بدلاً من reload العادي، سنعيد تحميل الصفحة ونضيف 'cart_open=1' للرابط
+        window.location.href = window.location.pathname + '?cart_open=1';
+    });
+}
+
+$('.filter-btn').click(function(){
+
+    const filter =
+        $(this).data('filter');
+
+    $('.filter-btn').removeClass(
+        'active'
+    );
+
+    $(this).addClass(
+        'active'
+    );
+
+});
+
+$(document).ready(function(){
+    // الكود الذي يفتح السلة تلقائياً إذا وجد cart_open في الرابط
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.has('cart_open')) {
+        $('#cartModal').modal('show');
+    }
+});
+
+$('#fabricSearch').on('keyup', function() {
+    var value = $(this).val().toLowerCase().trim(); // قمنا بإضافة trim() لإزالة أي مسافات زائدة
+    
+    $('.fabric-item').each(function() {
+        // نأخذ النص من الـ h4 وننظفه من المسافات الزائدة
+        var productName = $(this).find('h4').text().toLowerCase().trim();
+        
+        // إذا كان حقل البحث فارغاً، نظهر الجميع
+        if (value === "") {
+            $(this).show();
+        } 
+        // إذا كان الاسم يحتوي على ما كتبه المستخدم
+        else if (productName.includes(value)) {
+            $(this).show();
+        } 
+        // غير ذلك نخفيه
+        else {
+            $(this).hide();
+        }
+    });
+});
+
+</script>
+<style>
+    /* جعل البطاقة الأساسية تعمل بنظام flex */
+    .fabric-item .card {
+        display: flex;
+        flex-direction: column;
+    }
+    
+    /* جعل محتوى البطاقة يمتد لملء الفراغ */
+    .fabric-item .card-body {
+        display: flex;
+        flex-direction: column;
+        flex-grow: 1;
+    }
+
+    /* جعل الوصف يأخذ المساحة المتاحة ويدفع الزر لأسفل */
+    .fabric-item .card-body p {
+        flex-grow: 1;
+    }
+
+    /* ضمان بقاء زر Add to Cart في الأسفل دائماً */
+    .fabric-item .card-body button {
+        margin-top: auto;
+    }
+    #fabricSearch:focus {
+    border-color: #28a745;
+    box-shadow: 0 0 5px rgba(40, 167, 69, 0.5);
+    }
+</style>
+{% endblock %}
