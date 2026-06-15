@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="card shadow-sm">
+    <div class="card-header bg-dark">
+        <h3 class="card-title">📦 Inventory Control (قائمة المنتجات)</h3>
+    </div>
+    <div class="card-body p-0">
+        <table class="table table-hover table-striped text-center mb-0">
+            <thead>
+                <tr>
+                    <th>المعرف</th>
+                    <th>اسم المنتج</th>
+                    <th>نوع القماش (AI)</th>
+                    <th>السماكة (AI)</th>
+                    <th>الجودة (AI)</th>
+                    <th>الاستخدام المقترح (AI)</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for product in products %}
+                <tr>
+                    <td>{{ product.id }}</td>
+                    <td><strong>{{ product.name }}</strong></td>
+                    
+                    {# التحقق من وجود بيانات تحليل الـ AI أولاً قبل العرض #}
+                    {% if product.ai_analysis %}
+                        <td><span class="badge badge-info">{{ product.ai_analysis.fabric_type }}</span></td>
+                        <td>{{ product.ai_analysis.thickness }}</td>
+                        <td>
+                            <span class="badge badge-{% if product.ai_analysis.quality_score|int > 75 %}success{% else %}warning{% endif %}">
+                                {{ product.ai_analysis.quality_score }}%
+                            </span>
+                        </td>
+                        <td>{{ product.ai_analysis.recommended_usage }}</td>
+                    {% else %}
+                        <td colspan="4" class="text-muted text-sm">لا تتوفر بيانات تحليل ذكي</td>
+                    {% endif %}
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

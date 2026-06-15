@@ -1,5 +1,6 @@
 from app import db, login_manager
 from flask_login import UserMixin
+from sqlalchemy.types import JSON
 from werkzeug.security import generate_password_hash, check_password_hash
 
 # =====================
@@ -47,7 +48,8 @@ class Product(db.Model):
     customs_file = db.Column(db.String(100), nullable=True)
 
     is_active = db.Column(db.Boolean, nullable=False, default=True)
-
+    
+    ai_analysis = db.Column(db.JSON, nullable=True) 
     variants = db.relationship(
         'ProductVariant',
         backref='product',

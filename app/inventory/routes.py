@@ -1,9 +1,12 @@
 import os
 import uuid
+import json
+from app.models import Product, db 
 from flask import Blueprint, render_template, request, redirect, url_for, current_app, flash,session ,jsonify
 from flask_login import login_required
 from sqlalchemy import func
 from flask import request 
+from app.ai_service import analyze_fabric_image
 from sqlalchemy.orm import joinedload 
 from datetime import datetime 
 from app import db
@@ -561,3 +564,70 @@ def pending_orders():
     print(f"DEBUG: Found {len(pending_items)} pending orders")
     
     return render_template('inventory/pending_orders.html', pending_items=pending_items)    
+#-------------------------------------------------------------------------------------------------------------------
+#AI    
+#-------------------------------------------------------------------------------------------------------------------
+@inventory_bp.route('/analyze', methods=['GET', 'POST'])
+def analyze():
+    if request.method == 'POST':
+        # التحقق من وجود ملف في الطلب
+        if 'file' not in request.files:
+            return "لم يتم رفع ملف", 400
+        
+        file = request.files['file']
+        if file.filename == '':
+            return "لم يتم اختيار صورة", 400
+
+        if file:
+            # حفظ الصورة في المجلد الذي أنشأناه سابقاً
+            upload_folder = 'app/static/uploads'
+            if not os.path.exists(upload_folder):
+                os.makedirs(upload_folder)
+                
+            file_path = os.path.join(upload_folder, file.filename)
+            file.save(file_path)
+            
+            # استدعاء دالة الذكاء الاصطناعي التي كتبناها
+            try:
+                ai_result = analyze_fabric_image(file_path)
+                # تمرير النتيجة إلى صفحة المعاينة (سننشئها في الخطوة الخامسة)
+                return render_template('inventory/preview.html', result=ai_result, image_name=file.filename)
+            except Exception as e:
+                return f"حدث خطأ أثناء التحليل: {str(e)}"
+            
+    return render_template('inventory/upload.html')
+#---------------------------------------------
+#save
+#--------------------------------------------
+@inventory_bp.route('/save-product', methods=['POST'])
+def save_product():
+    try:
+        # استلام البيانات من فورم preview.html
+        name = request.form.get('name')
+        ai_analysis_json = request.form.get('ai_analysis_json')
+        
+        # تحويل النص القادم من الفورم إلى JSON (Python Dict)
+        analysis_data = json.loads(ai_analysis_json) if ai_analysis_json else None
+        
+        # إنشاء منتج جديد وتخزين بيانات الـ AI فيه
+        new_product = Product(
+            name=name,
+            ai_analysis=analysis_data
+        )
+        
+        db.session.add(new_product)
+        db.session.commit()
+        
+        flash('تم حفظ المنتج ونتائج التحليل الذكي بنجاح! 🎉', 'success')
+        return redirect(url_for('inventory.list_products'))
+        
+    except Exception as e:
+        db.session.rollback()
+        flash(f'حدث خطأ أثناء حفظ المنتج: {str(e)}', 'danger')
+        return redirect(url_for('inventory.analyze'))
+#-----------------------
+@inventory_bp.route('/products')
+def list_product():
+    # جلب جميع المنتجات من قاعدة البيانات لعرضها للمدير
+    products = Product.query.all()
+    return render_template('inventory/products_list.html', products=products)        

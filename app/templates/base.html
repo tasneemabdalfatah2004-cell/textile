@@ -109,7 +109,7 @@
 
                     <li class="nav-header text-uppercase" style="color: #bdc3c7;">AI Engine</li>
                     <li class="nav-item">
-                        <a href="#" class="nav-link">
+                        <a href="{{ url_for('inventory.analyze') }}" class="nav-link {% if request.endpoint == 'inventory.analyze' %}active{% endif %}">
                             <i class="nav-icon fas fa-brain text-warning"></i>
                             <p>Texture Analysis</p>
                         </a>

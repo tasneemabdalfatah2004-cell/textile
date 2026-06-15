@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row pt-4 animate__animated animate__fadeIn">
+    <div class="col-lg-5 mb-4">
+        <div class="card shadow-lg border-0 h-100" style="border-radius: 15px; overflow: hidden;">
+            <div class="card-header bg-gradient-dark text-white py-3">
+                <h3 class="card-title text-bold mb-0">
+                    <i class="fas fa-image mr-2 text-warning"></i> العينة المرفوعة
+                </h3>
+            </div>
+            <div class="card-body d-flex align-items-center justify-content-center bg-light p-4">
+                <img src="{{ url_for('static', filename='uploads/' + image_name) }}" 
+                     class="img-fluid rounded shadow-sm" alt="Fabric Sample" 
+                     style="max-height: 380px; object-fit: cover; width: 100%;">
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-7 mb-4">
+        <div class="card shadow-lg border-0 h-100" style="border-radius: 15px;">
+            <div class="card-header bg-gradient-info text-white py-3">
+                <h3 class="card-title text-bold mb-0">
+                    <i class="fas fa-chart-pie mr-2"></i> تقرير الفحص المخبري (AI)
+                </h3>
+            </div>
+            
+            <form action="{{ url_for('inventory.save_product') }}" method="POST">
+                <div class="card-body p-4">
+                    <div class="mb-4">
+                        <label class="text-muted text-sm d-block">مؤشر جودة النسيج الكلية</label>
+                        <div class="d-flex align-items-center">
+                            <h2 class="text-bold mr-3 mb-0 text-info">{{ result.quality_score }}%</h2>
+                            <div class="progress w-100" style="height: 12px; border-radius: 10px;">
+                                <div class="progress-bar bg-info progress-bar-striped progress-bar-animated" 
+                                     role="progressbar" style="width: {{ result.quality_score }}%"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <hr class="my-4">
+
+                    <div class="row">
+                        <div class="col-sm-6 mb-3">
+                            <div class="p-3 bg-light rounded" style="border-left: 4px solid #17a2b8;">
+                                <span class="text-xs text-muted d-block text-uppercase">نوع القماش المخمن</span>
+                                <strong class="text-lg text-dark">{{ result.fabric_type }}</strong>
+                            </div>
+                        </div>
+                        <div class="col-sm-6 mb-3">
+                            <div class="p-3 bg-light rounded" style="border-left: 4px solid #ffc107;">
+                                <span class="text-xs text-muted d-block text-uppercase">كثافة وسماكة الخامة</span>
+                                <strong class="text-lg text-dark">{{ result.thickness }}</strong>
+                            </div>
+                        </div>
+                        <div class="col-12 mb-3">
+                            <div class="p-3 bg-light rounded" style="border-left: 4px solid #28a745;">
+                                <span class="text-xs text-muted d-block text-uppercase">خطوط الاستخدام الموصى بها</span>
+                                <strong class="text-md text-dark d-block mt-1">{{ result.recommended_usage }}</strong>
+                            </div>
+                        </div>
+                    </div>
+
+                    <hr class="my-3">
+
+                    <div class="form-group mt-3">
+                        <label class="text-bold text-secondary">🏷️ اسم المنتج المقترح في المستودع:</label>
+                        <input type="text" name="name" class="form-control form-control-lg border-info" 
+                               placeholder="مثال: قماش صوف تركي فاخر - بيج" style="border-radius: 8px;" required>
+                    </div>
+
+                    <input type="hidden" name="ai_analysis_json" value='{{ result | tojson }}'>
+                </div>
+                <div class="card-footer bg-white border-top-0 d-flex justify-content-between p-4">
+                    <a href="{{ url_for('inventory.analyze') }}" class="btn btn-default btn-lg px-4" style="border-radius: 8px;">
+                        <i class="fas fa-arrow-right mr-2"></i> إلغاء وإعادة الفحص
+                    </a>
+                    <button type="submit" class="btn btn-success btn-lg px-5 shadow" style="border-radius: 8px;">
+                        <i class="fas fa-check-circle mr-2"></i> اعتماد وحفظ في المخزن
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
