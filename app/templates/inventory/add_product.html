@@ -12,12 +12,26 @@
                 
                 <h4 class="text-success mb-3">Fabric Information</h4>
                 <div class="row">
-                    <div class="col-md-8">
+                    <!-- Fabric Name -->
+                    <div class="col-md-5">
                         <label>Fabric Name</label>
                         <input type="text" id="fabric-name" name="name" class="form-control" list="fabric-list" autocomplete="off" required>
                         <datalist id="fabric-list"></datalist>
                     </div>
+
+                    <!-- 🌟 New Category Dropdown 🌟 -->
                     <div class="col-md-4">
+                        <label>Fabric Category</label>
+                        <select class="form-control" id="category_id" name="category_id" required>
+                            <option value="">-- Select Category --</option>
+                            {% for category in categories %}
+                                <option value="{{ category.id }}">{{ category.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <!-- Main Image -->
+                    <div class="col-md-3">
                         <label>Main Image</label>
                         <input type="file" name="image" class="form-control" accept="image/*">
                     </div>
@@ -54,7 +68,6 @@
                         <label>Supplier Name</label>
                         <input type="text" name="partner_name" class="form-control" required>
                     </div>
-                    
                 </div>
 
                 <hr>
@@ -80,7 +93,6 @@
                         </div>
                     </div>
                 </div>
-
                 <button type="button" class="btn btn-primary" onclick="addColorRow()">+ Add Pattern</button>
             </div>
 
@@ -119,7 +131,7 @@ function previewImage(input) {
     }
 }
 
-// تصحيح روابط البحث
+// Fixed fetch template string URLs
 const fabricInput = document.getElementById("fabric-name");
 fabricInput.addEventListener("input", async function() {
     const value = this.value.trim();

@@ -4,7 +4,8 @@ from sqlalchemy import func
 from datetime import datetime, timedelta
 
 from app import db
-from app.models import Product, ProductVariant, Order, OrderItem
+# أضفنا استدعاء نموذج الـ Category هنا
+from app.models import Product, ProductVariant, Order, OrderItem, Category
 
 main_bp = Blueprint('main', __name__)
 
@@ -40,6 +41,16 @@ def dashboard():
             .limit(5)\
             .all()
 
+        # 🌟 5. إحصائيات الذكاء الاصطناعي والأصناف الجديدة للجنة المناقشة 🌟
+        total_categories = Category.query.count() # حساب عدد أصناف الأقمشة بالمحل
+        
+        # حساب متوسط مؤشر الجودة للأقمشة المرفوعة بالـ AI
+        avg_quality = db.session.query(func.avg(Product.ai_overall_quality_index)).scalar() or 0
+        avg_quality_percentage = round(avg_quality, 1)
+
+        # حساب عدد الأقمشة التي اكتشف الـ AI بها عيوب مصنعية تلقائياً
+        defective_fabrics_count = Product.query.filter_by(ai_defects_detected=True).count()
+
         return render_template(
             'dashboard.html',
             products=products,
@@ -47,10 +58,23 @@ def dashboard():
             low_stock_count=low_stock_count,
             total_profit=total_revenue,
             pending_orders=pending_orders,
-            recent_sales=recent_sales
+            recent_sales=recent_sales,
+            
+            # تمرير المتغيرات الذكية الجديدة للـ HTML
+            total_categories=total_categories,
+            avg_quality_percentage=avg_quality_percentage,
+            defective_fabrics_count=defective_fabrics_count
         )
 
     except Exception as e:
         print(f"Error: {e}")
         flash("حدث خطأ أثناء تحميل لوحة التحكم.", "danger")
-        return render_template('dashboard.html', low_stock_count=0, pending_orders=[], recent_sales=[])
+        return render_template(
+            'dashboard.html', 
+            low_stock_count=0, 
+            pending_orders=[], 
+            recent_sales=[],
+            total_categories=0,
+            avg_quality_percentage=0,
+            defective_fabrics_count=0
+        )

@@ -4,7 +4,7 @@
     <div class="d-flex justify-content-between align-items-center mb-4">
         <div>
             <h2 class="fw-bold text-dark mb-0">{{ product.name }}</h2>
-            <p class="text-muted">Manage stock, prices, and fabric designs</p>
+            <p class="text-muted">Manage stock, prices, category, and fabric designs</p>
         </div>
         <div class="text-end">
             <span class="badge bg-success fs-6 p-2 shadow-sm rounded-pill px-3">
@@ -15,6 +15,24 @@
 
     <form action="{{ url_for('inventory.edit_product', id=product.id) }}" method="POST" enctype="multipart/form-data">
         
+        <!-- 🌟 New Category Selection Card 🌟 -->
+        <div class="card mb-4 border-0 shadow-sm rounded-4 p-4">
+            <div class="row align-items-center">
+                <div class="col-md-12">
+                    <label class="text-muted small fw-bold mb-2"><i class="fas fa-folder text-success me-1"></i> FABRIC CATEGORY</label>
+                    <select class="form-select form-select-lg border-0 bg-light" id="category_id" name="category_id" required style="border-radius: 0.8rem;">
+                        <option value="">-- Select Category --</option>
+                        {% for category in categories %}
+                            <option value="{{ category.id }}" {% if category.id == product.category_id %}selected{% endif %}>
+                                {{ category.name }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <!-- Prices Card -->
         <div class="card mb-4 border-0 shadow-sm rounded-4 p-3">
             <div class="row align-items-center">
                 <div class="col-md-6">
@@ -71,6 +89,6 @@
 
 <style>
     .rounded-4 { border-radius: 1.5rem !important; }
-    .form-control:focus { box-shadow: none; border: 2px solid #0d6efd !important; }
+    .form-control:focus, .form-select:focus { box-shadow: none; border: 2px solid #0d6efd !important; }
 </style>
 {% endblock %}

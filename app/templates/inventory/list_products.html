@@ -34,7 +34,7 @@
                 <thead class="table-dark">
                     <tr>
                         <th>Image</th>
-                        <th>Name</th>
+                        <th>Fabric Specifications</th>
                         <th>Cost</th>
                         <th>Sell</th>
                         <th class="text-start">Patterns & Stock</th>
@@ -45,14 +45,50 @@
                 <tbody>
                 {% for product in products %}
                 <tr>
+                    <!-- 1. Fabric Image -->
                     <td>
                         <img src="{{ url_for('static', filename='uploads/' + (product.image_file or 'default.jpg')) }}"
-                             style="width:50px;height:50px;object-fit:cover;border-radius:8px;">
+                             style="width:60px;height:60px;object-fit:cover;border-radius:8px;">
                     </td>
-                    <td class="fw-bold text-start">{{ product.name }}</td>
+                    
+                    <!-- 2. Fabric Specifications (Name + Category + AI Analysis) -->
+                    <td class="text-start">
+                        <div class="fw-bold text-dark fs-5 mb-1">{{ product.name }}</div>
+                        
+                        <!-- Category Badge -->
+                        <div class="mb-2">
+                            {% if product.category %}
+                                <span class="badge bg-secondary"><i class="fas fa-folder me-1"></i>{{ product.category.name }}</span>
+                            {% else %}
+                                <span class="badge bg-light text-muted">Uncategorized</span>
+                            {% endif %}
+                        </div>
+
+                        <!-- AI Smart Overview -->
+                        {% if product.ai_overall_quality_index %}
+                        <div class="d-flex flex-wrap gap-1 align-items-center">
+                            <span class="badge bg-info text-dark small"><i class="fas fa-robot me-1"></i> {{ product.ai_fabric_type or 'Fabric' }}</span>
+                            <span class="badge {% if product.ai_overall_quality_index|int >= 85 %}bg-success{% elif product.ai_overall_quality_index|int >= 60 %}bg-warning text-dark{% else %}bg-danger{% endif %} small">
+                                Quality: {{ product.ai_overall_quality_index }}%
+                            </span>
+                            {% if product.ai_defects_detected %}
+                                <span class="badge bg-danger small" title="{{ product.ai_defects_details }}"><i class="fas fa-exclamation-circle"></i> Defects</span>
+                            {% else %}
+                            <span class="badge bg-light text-success border border-success small"><i class="fas fa-check-circle"></i> Passed</span>
+                            {% endif %}
+                        </div>
+                        {% else %}
+                        <small class="text-muted"><i class="fas fa-robot text-secondary"></i> No AI data</small>
+                        {% endif %}
+                    </td>
+                    
+                    <!-- 3. Cost Price -->
                     <td class="text-secondary">${{ "%.2f"|format(product.cost_price_per_meter) }}</td>
+                    
+                    <!-- 4. Selling Price -->
                     <td class="fw-bold text-success">${{ "%.2f"|format(product.selling_price) }}</td>
                     
+                    <!-- 5. Patterns and Stock -->
                     <td class="text-start">
                         {% set variants_to_show = product.variants|selectattr("quantity", "lessthan", 11)|list if filter_type == 'low_stock' else product.variants %}
                         {% for v in variants_to_show %}
@@ -72,17 +108,25 @@
                         </div>
                         {% endfor %}
                     </td>
-                    <td>
-                        <span class="badge {{ 'bg-danger' if product.total_quantity <= 10 else 'bg-primary' }} px-3 py-2 rounded-pill">
-                            {{ product.total_quantity }} m
+                    
+                    <!-- 6. Total Stock -->
+                    <td class="fw-bold">
+                        {% set total_qty = product.variants|sum(attribute='quantity') %}
+                        <span class="{{ 'text-danger' if total_qty <= 15 else 'text-dark' }}">
+                            {{ total_qty }} m
                         </span>
                     </td>
+                    
+                    <!-- 7. Actions (Edit / Archive) -->
                     <td>
-                        <div class="d-flex justify-content-center gap-2">
-                            <a href="{{ url_for('inventory.edit_product', id=product.id) }}" class="btn btn-warning btn-sm text-white rounded-pill"><i class="fas fa-edit"></i></a>
-                            <form method="POST" action="{{ url_for('inventory.toggle_archive', id=product.id) }}">
-                                <button type="submit" class="btn btn-{{ 'danger' if product.is_active else 'success' }} btn-sm rounded-pill">
-                                    <i class="fas fa-{{ 'archive' if product.is_active else 'box-open' }}"></i>
+                        <div class="d-flex gap-1 justify-content-center">
+                            <a href="{{ url_for('inventory.edit_product', id=product.id) }}" class="btn btn-sm btn-outline-primary rounded-pill px-3">
+                                <i class="fas fa-edit"></i> Edit
+                            </a>
+                            <form action="{{ url_for('inventory.toggle_archive', id=product.id) }}" method="POST" style="display:inline;">
+                                <button type="submit" class="btn btn-sm {% if product.is_active %}btn-outline-danger{% else %}btn-outline-success{% endif %} rounded-pill px-3">
+                                    <i class="fas {% if product.is_active %}fa-archive{% else %}fa-box-open{% endif %}"></i> 
+                                    {{ "Archive" if product.is_active else "Restore" }}
                                 </button>
                             </form>
                         </div>
@@ -97,18 +141,22 @@
 
 <script>
 function filterTable() {
-  var input, filter, table, tr, td, i, txtValue;
-  input = document.getElementById("searchInput");
-  filter = input.value.toUpperCase();
-  table = document.getElementById("productTable");
-  tr = table.getElementsByTagName("tr");
-  for (i = 1; i < tr.length; i++) {
-    td = tr[i].getElementsByTagName("td")[1];
-    if (td) {
-      txtValue = td.textContent || td.innerText;
-      tr[i].style.display = txtValue.toUpperCase().indexOf(filter) > -1 ? "" : "none";
+    const input = document.getElementById("searchInput");
+    const filter = input.value.toUpperCase();
+    const table = document.getElementById("productTable");
+    const tr = table.getElementsByTagName("tr");
+
+    for (let i = 1; i < tr.length; i++) {
+        let td = tr[i].getElementsByTagName("td")[1]; // الفحص في عمود البيانات الأساسية الثاني
+        if (td) {
+            let txtValue = td.textContent || td.innerText;
+            if (txtValue.toUpperCase().indexOf(filter) > -1) {
+                tr[i].style.display = "";
+            } else {
+                tr[i].style.display = "none";
+            }
+        }
     }
-  }
 }
 </script>
 {% endblock %}

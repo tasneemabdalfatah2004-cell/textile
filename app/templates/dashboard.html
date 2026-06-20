@@ -1,36 +1,55 @@
 {% extends "base.html" %}
 
 {% block content %}
-<div class="container-fluid pt-4">
+<div class="container-fluid pt-4" dir="ltr">
 
-    <div class="mb-4">
-        <h1 class="font-weight-bold text-dark"><i class="fas fa-tachometer-alt text-primary"></i> Factory Overview</h1>
-        <p class="text-muted">Smart Inventory & Order Management</p>
+    <div class="mb-4 d-flex justify-content-between align-items-center border-bottom pb-3">
+        <div>
+            <h1 class="font-weight-bold text-dark mb-1"><i class="fas fa-tachometer-alt text-primary"></i> Factory Overview</h1>
+            <p class="text-muted mb-0">Smart Inventory, Categories & Factory Order Management</p>
+        </div>
+        <div class="text-end">
+            <span class="badge bg-light text-dark border p-2"><i class="fas fa-calendar-alt text-secondary me-1"></i> Live Factory Logs</span>
+        </div>
     </div>
 
     <div class="row">
-        <div class="col-lg-3 col-6">
-            <div class="small-box bg-info shadow-sm" style="border-radius:12px;">
-                <div class="inner p-3"><h3>{{ products|length }}</h3><p>Fabric Types</p></div>
+        <div class="col-lg-2 col-md-4 col-6 mb-3">
+            <div class="small-box bg-info shadow-sm h-100" style="border-radius:12px;">
+                <div class="inner p-3">
+                    <h3>{{ products|length }}</h3>
+                    <p class="mb-0">Fabric Types</p>
+                </div>
                 <div class="icon"><i class="fas fa-boxes"></i></div>
-                <a href="{{ url_for('inventory.list_products') }}" class="small-box-footer">View Inventory <i class="fas fa-arrow-circle-right"></i></a>
+                <a href="{{ url_for('inventory.list_products') }}" class="small-box-footer" style="position: absolute; bottom: 0; width: 100%;">View Inventory <i class="fas fa-arrow-circle-right"></i></a>
             </div>
         </div>
-        <div class="col-lg-3 col-6">
-            <div class="small-box bg-success shadow-sm" style="border-radius:12px;">
+        
+        <div class="col-lg-2 col-md-4 col-6 mb-3">
+            <div class="small-box shadow-sm h-100 text-white" style="border-radius:12px; background-color: #6f42c1 !important;">
+                <div class="inner p-3">
+                    <h3>{{ total_categories }}</h3>
+                    <p class="mb-0">Total Categories</p>
+                </div>
+                <div class="icon"><i class="fas fa-folder-open text-white-50"></i></div>
+                <a href="{{ url_for('inventory.manage_categories') }}" class="small-box-footer text-white" style="position: absolute; bottom: 0; width: 100%;">Manage Categories <i class="fas fa-arrow-circle-right"></i></a>
+            </div>
+        </div>
+        <div class="col-lg-2 col-md-4 col-6 mb-3">
+            <div class="small-box bg-success  h-100shadow-sm" style="border-radius:12px;">
                 <div class="inner p-3"><h3>{{ pending_orders|length }}</h3><p>Pending Orders</p></div>
                 <div class="icon"><i class="fas fa-shopping-cart"></i></div>
                 <a href="{{ url_for('inventory.pending_orders') }}" class="small-box-footer">Manage Orders <i class="fas fa-arrow-circle-right"></i></a>
             </div>
         </div>
-        <div class="col-lg-3 col-6">
+        <div class="col-lg-2 col-md-4 col-6 mb-3">
             <div class="small-box bg-warning shadow-sm" style="border-radius:12px;">
                 <div class="inner p-3 text-white"><h3>{{ low_stock_count }}</h3><p>Stock Alerts</p></div>
                 <div class="icon"><i class="fas fa-exclamation-triangle"></i></div>
                 <a href="{{ url_for('inventory.list_products', filter='low_stock') }}" class="small-box-footer text-white">Review Stocks <i class="fas fa-arrow-circle-right"></i></a>
             </div>
         </div>
-        <div class="col-lg-3 col-6">
+        <div class="col-lg-2 col-md-4 col-6 mb-3">
             <div class="small-box bg-danger shadow-sm" style="border-radius:12px;">
                 <div class="inner p-3"><h3>${{ "{:,.0f}".format(total_profit) }}</h3><p>Total Revenue</p></div>
                 <div class="icon"><i class="fas fa-dollar-sign"></i></div>
@@ -44,40 +63,49 @@
             <div class="card shadow-sm border-0" style="border-radius:15px;">
                 <div class="card-header bg-white py-3"><h5 class="mb-0 font-weight-bold"><i class="fas fa-clock text-warning"></i> Pending Orders</h5></div>
                 <div class="card-body p-0">
-                    <table class="table table-hover align-middle mb-0">
-                        <thead class="table-light"><tr><th>Customer</th><th>Fabric</th><th>Quantity</th><th>Action</th></tr></thead>
-                        <tbody>
-                        {% for item in pending_orders %}
-                        <tr>
-                            <td>{{ item.order.customer.name }}</td>
-                            <td>{{ item.variant.product.name }}</td>
-                            <td>{{ item.quantity_ordered }} m</td>
-                            <td>
-                                <form method="POST" action="{{ url_for('inventory.approve_order', order_id=item.order.id) }}">
-                                    <button class="btn btn-sm btn-success rounded-pill"><i class="fas fa-check"></i> Approve</button>
-                                </form>
-                            </td>
-                        </tr>
-                        {% else %}
-                        <tr><td colspan="4" class="text-center text-muted py-4">No pending orders</td></tr>
-                        {% endfor %}
-                        </tbody>
-                    </table>
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle mb-0 text-center">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Customer</th>
+                                    <th>Fabric</th>
+                                    <th>Quantity</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                            {% for item in pending_orders %}
+                            <tr>
+                                <td class="fw-bold text-start ps-4">{{ item.order.customer.name if item.order and item.order.customer else 'Guest Customer' }}</td>
+                                <td>{{ item.variant.product.name if item.variant and item.variant.product else 'Fabric' }}</td>
+                                <td><span class="badge bg-light text-dark font-weight-bold px-3 py-2">{{ item.quantity_ordered }} m</span></td>
+                            </tr>
+                            {% else %}
+                            <tr><td colspan="3" class="text-center text-muted py-5">No active pending orders in queue</td></tr>
+                            {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
         </div>
         
-        <div class="col-lg-4">
-            <div class="card shadow-sm border-0" style="border-radius:15px;">
-                <div class="card-header bg-white py-3"><h5 class="mb-0 font-weight-bold"><i class="fas fa-bell text-danger"></i> Stock Alerts</h5></div>
-                <div class="list-group list-group-flush">
+        <div class="col-lg-4 mb-4">
+            <div class="card shadow-sm border-0 h-100" style="border-radius:15px;">
+                <div class="card-header bg-white py-3"><h5 class="mb-0 font-weight-bold"><i class="fas fa-bell text-danger me-1"></i> Low Stock Alerts</h5></div>
+                <div class="list-group list-group-flush" style="max-height: 350px; overflow-y: auto;">
                     {% for variant in low_stock_variants %}
-                    <li class="list-group-item">
-                        <strong>{{ variant.product.name }}</strong><br>
-                        <small class="text-danger">{{ variant.quantity }}m remaining</small>
+                    <li class="list-group-item d-flex justify-content-between align-items-center py-3">
+                        <div>
+                            <strong class="text-dark">{{ variant.product.name }}</strong><br>
+                            <small class="text-muted">Pattern: {{ variant.color_name }}</small>
+                        </div>
+                        <span class="badge bg-danger rounded-pill px-3 py-2">{{ variant.quantity }}m left</span>
                     </li>
                     {% else %}
-                    <li class="list-group-item text-muted">All stocks are healthy!</li>
+                    <li class="list-group-item text-muted text-center py-5">
+                        <i class="fas fa-check-circle text-success fa-2x mb-2 d-block"></i>
+                        All fabric stocks are healthy!
+                    </li>
                     {% endfor %}
                 </div>
             </div>

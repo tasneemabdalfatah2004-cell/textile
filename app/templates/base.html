@@ -13,7 +13,7 @@
         .main-sidebar { background-color: #2c3e50 !important; }
         .brand-link { border-bottom: 1px solid #4b545c !important; text-align: center; }
         .nav-link.active { background-color: #3498db !important; }
-        /* تحسين شكل الهيدر للزبون */
+        
         {% if not current_user.is_authenticated %}
         .main-header { margin-left: 0 !important; }
         .content-wrapper { margin-left: 0 !important; }
@@ -40,29 +40,26 @@
        
         <ul class="navbar-nav ml-auto align-items-center">
             {% if not current_user.is_authenticated %}
-    <li class="nav-item">
-        <button type="button" class="btn btn-outline-success position-relative " data-toggle="modal" data-target="#cartModal">
-            <i class="fas fa-shopping-cart"></i>
-            <span id="cart-count"class="badge badge-danger position-absolute" style="top:0; right:0;">
-                {{ session['cart']|length if session.get('cart') else 0 }}
-            </span>
-        </button>
-    </li>
-    {%endif%}
+            <li class="nav-item">
+                <button type="button" class="btn btn-outline-success position-relative" data-toggle="modal" data-target="#cartModal">
+                    <i class="fas fa-shopping-cart"></i>
+                    <span id="cart-count" class="badge badge-danger position-absolute" style="top:0; right:0;">
+                        {{ session['cart']|length if session.get('cart') else 0 }}
+                    </span>
+                </button>
+            </li>
+            {% endif %}
 
-    {% if current_user.is_authenticated %}
-        <li class="nav-item d-none d-sm-inline-block">
-            
-        </li>
-        <li class="nav-item">
-            <a href="{{ url_for('auth.logout') }}" class="nav-link text-danger"><i class="fas fa-sign-out-alt"></i> Logout</a>
-        </li>
-    {% else %}
-        <li class="nav-item">
-            <a href="{{ url_for('auth.login') }}" class="nav-link btn btn-outline-primary btn-sm px-3 mx-2">Admin Login</a>
-        </li>
-    {% endif %}
- </ul>
+            {% if current_user.is_authenticated %}
+                <li class="nav-item">
+                    <a href="{{ url_for('auth.logout') }}" class="nav-link text-danger"><i class="fas fa-sign-out-alt"></i> Logout</a>
+                </li>
+            {% else %}
+                <li class="nav-item">
+                    <a href="{{ url_for('auth.login') }}" class="nav-link btn btn-outline-primary btn-sm px-3 mx-2">Admin Login</a>
+                </li>
+            {% endif %}
+        </ul>
     </nav>
 
     {% if current_user.is_authenticated %}
@@ -71,7 +68,6 @@
             <i class="fas fa-microchip mr-2 text-info"></i>
             <span class="brand-text font-weight-light">Smart Textile AI</span>
         </a>
-
         <div class="sidebar">
             <nav class="mt-3">
                 <ul class="nav nav-pills nav-sidebar flex-column" data-widget="treeview" role="menu">
@@ -88,6 +84,14 @@
                             <p>Inventory Control</p>
                         </a>
                     </li>
+                    
+                    <li class="nav-item">
+                        <a href="{{ url_for('inventory.manage_categories') }}" class="nav-link {% if request.endpoint == 'inventory.manage_categories' %}active{% endif %}">
+                            <i class="nav-icon fas fa-folder-open text-warning"></i>
+                            <p>Manage Categories</p>
+                        </a>
+                    </li>
+
                     <li class="nav-item">
                         <a href="{{ url_for('inventory.add_product') }}" class="nav-link {% if request.endpoint == 'inventory.add_product' %}active{% endif %}">
                             <i class="nav-icon fas fa-plus-circle"></i>
@@ -101,10 +105,10 @@
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a href="{{ url_for('inventory.list_sources') }}" class="nav-link text-white py-3 px-4 d-flex align-items-center">
-                             <i class="fas fa-handshake me-3 text-success"></i>
-                             <p>المصادر والشركاء</p>
-                       </a>
+                        <a href="{{ url_for('inventory.list_sources') }}" class="nav-link {% if request.endpoint == 'inventory.list_sources' %}active{% endif %}">
+                             <i class="nav-icon fas fa-handshake text-success"></i>
+                             <p>List Sources</p>
+                        </a>
                     </li>
 
                     <li class="nav-header text-uppercase" style="color: #bdc3c7;">AI Engine</li>
@@ -140,6 +144,7 @@
     </div>
     
 </div>
+
 <script src="{{ url_for('static', filename='plugins/jquery/jquery.min.js') }}"></script>
 <script src="{{ url_for('static', filename='plugins/bootstrap/js/bootstrap.bundle.min.js') }}"></script>
 <script src="{{ url_for('static', filename='dist/js/adminlte.min.js') }}"></script>
@@ -147,24 +152,15 @@
 
 <script>
 $(document).ready(function() {
-    // تشغيل المودال إذا كان الرابط يحتوي على الإشارة
+    // Open active cart session from URL trigger parameters
     if(window.location.search.includes('cart_open')) {
         $('#cartModal').modal('show');
     }
 
-    // بدلاً من data-bs-toggle، استخدم هذا الكود الموحد لأي زر يفتح مودال
+    // Unified script handling trigger for specific custom modals
     $('.open-modal-btn').click(function() {
         var target = $(this).data('target');
         $(target).modal('show');
-    });
-
-    // كود البحث
-    $('#fabricSearch').on('keyup', function() {
-        var value = $(this).val().toLowerCase().trim();
-        $('.fabric-item').each(function() {
-            var productName = $(this).find('h4').text().toLowerCase().trim();
-            $(this).toggle(productName.includes(value));
-        });
     });
 });
 </script>

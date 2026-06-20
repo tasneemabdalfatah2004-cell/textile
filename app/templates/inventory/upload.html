@@ -6,19 +6,19 @@
         <div class="card card-outline card-info shadow-lg animate__animated animate__fadeInUp">
             <div class="card-header bg-white border-bottom-0 text-center pt-4">
                 <h3 class="card-title float-none text-bold text-secondary" style="font-size: 1.5rem;">
-                    <i class="fas fa-qrcode text-info mr-2"></i> مسح وتحليل أنسجة القماش
+                    <i class="fas fa-microscope text-info mr-2"></i> Scan & Analyze Fabric Texture
                 </h3>
-                <p class="text-muted mt-2">قم برفع صورة واضحة لنقشة أو خامة القماش ليقوم الذكاء الاصطناعي بتحليلها فوراً</p>
+                <p class="text-muted mt-2">Upload a clear high-resolution image of the fabric weave or pattern for instant AI analysis</p>
             </div>
             
             <form action="{{ url_for('inventory.analyze') }}" method="POST" enctype="multipart/form-data">
                 <div class="card-body px-5 pb-4">
                     <div class="form-group">
-                        <div class="custom-file-upload border- dashed rounded p-5 text-center bg-light" 
+                        <div class="custom-file-upload border-dashed rounded p-5 text-center bg-light" 
                              style="border: 2px dashed #3498db; cursor: pointer; transition: all 0.3s ease;">
                             <i class="fas fa-cloud-upload-alt text-primary mb-3" style="font-size: 3.5rem;"></i>
-                            <h5 class="text-bold text-dark">اسحب الصورة إلى هنا أو اضغط للتصفح</h5>
-                            <p class="text-sm text-muted mb-0">يدعم صيغ JPG, PNG (الحد الأقصى 5 ميجابايت)</p>
+                            <h5 class="text-bold text-dark">Drag and drop image here or click to browse</h5>
+                            <p class="text-sm text-muted mb-0">Supports JPG, PNG formats (Max size: 5MB)</p>
                             <input type="file" name="file" class="form-control-file d-none" id="fabricFile" accept="image/*" required>
                         </div>
                         <div id="file-name-preview" class="text-center mt-3 text-success text-bold d-none">
@@ -29,7 +29,7 @@
                 
                 <div class="card-footer bg-white border-top-0 text-center pb-4">
                     <button type="submit" class="btn btn-info btn-lg px-5 shadow-sm text-bold" style="border-radius: 30px;">
-                        <i class="fas fa-brain mr-2"></i> بدء التحليل الذكي
+                        <i class="fas fa-brain mr-2"></i> Start Smart Analysis
                     </button>
                 </div>
             </form>

@@ -1,0 +1,117 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container mt-4" dir="rtl text-right">
+    <div class="text-center mb-4">
+        <h2 class="text-primary"><i class="fas fa-robot"></i> تقرير التحليل الذكي للقماش (AI Analysis)</h2>
+        <p class="text-muted">تم استخراج الخصائص البصرية والفيزيائية والنسيجية من الصورة بنجاح</p>
+    </div>
+
+    <div class="row">
+        <div class="col-md-4 mb-4">
+            <div class="card shadow-sm sticky-top" style="top: 20px;">
+                <img src="{{ url_for('static', filename='uploads/' + image_name) }}" class="card-img-top img-fluid rounded" alt="Fabric Image" style="max-height: 350px; object-fit: cover;">
+                <div class="card-body bg-light text-center">
+                    <h5 class="card-title text-secondary">العينة المرفوعة</h5>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-8">
+            <div class="card border-success mb-4 shadow-sm">
+                <div class="card-body d-flex justify-content-between align-items-center">
+                    <div>
+                        <h4 class="card-title text-success mb-1">مؤشر الجودة الرقمي الشامل (Quality Index)</h4>
+                        <p class="text-muted mb-0">تقييم تراكمي ذكي يعتمد على انتظام النسج، التشطيب، وخلو العينة من العيوب.</p>
+                    </div>
+                    <div class="bg-success text-white p-3 rounded-circle text-center shadow" style="width: 80px; height: 80px; display: flex; align-items: center; justify-content: center;">
+                        <h3 class="mb-0 fw-bold">{{ result.get('overall_quality_index', 100) }}%</h3>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-dark text-white">
+                    <h5 class="mb-0"><i class="fas fa-microscope"></i> تفاصيل الفحص المخبري البصري</h5>
+                </div>
+                <div class="card-body p-0">
+                    <table class="table table-bordered table-striped mb-0">
+                        <tbody>
+                            <tr>
+                                <th style="width: 35%;" class="bg-light">1. نوع القماش المتوقع</th>
+                                <td><span class="badge bg-primary fs-6">{{ result.get('fabric_type', 'غير محدد') }}</span></td>
+                            </tr>
+                            <tr>
+                                <th class="bg-light">2. تحليل السماكة الكثافية</th>
+                                <td>{{ result.get('thickness', 'غير محدد') }}</td>
+                            </tr>
+                            <tr>
+                                <th class="bg-light">3. كثافة وتداخل الخيوط</th>
+                                <td>{{ result.get('weaving_density', 'غير محدد') }}</td>
+                            </tr>
+                            <tr>
+                                <th class="bg-light">4. تقييم جودة وبنية النسج</th>
+                                <td>{{ result.get('weaving_quality_score', '0') }}% انتظام بنيوي</td>
+                            </tr>
+                            <tr>
+                                <th class="bg-light">5 & 10. النمط والزخارف الدقيقة</th>
+                                <td>{{ result.get('pattern_style', 'غير محدد') }}</td>
+                            </tr>
+                            <tr>
+                                <th class="bg-light">6. الملمس واتجاه الألياف</th>
+                                <td>{{ result.get('texture_feel', 'غير محدد') }} (الاتجاه: {{ result.get('fiber_direction', 'طولي') }})</td>
+                            </tr>
+                            <tr>
+                                <th class="bg-light">7. دراسة الوبرة السطحية</th>
+                                <td>{{ result.get('pile_analysis', 'لا يوجد وبرة') }}</td>
+                            </tr>
+                            <tr>
+                                <th class="bg-light">8. التضاريس وانعكاس الضوء</th>
+                                <td>{{ result.get('light_reflection', 'مطفي') }}</td>
+                                </tr>
+                            <tr>
+                                <th class="bg-light">9. جودة الحواف والتشطيب النهائي</th>
+                                <td>{{ result.get('finishing_quality', 'غير محدد') }}</td>
+                            </tr>
+                            <tr>
+                                <th class="bg-light">11. نظام كشف العيوب التلقائي</th>
+                                <td>
+                                    {% if result.get('defects_detected') %}
+                                        <span class="badge bg-danger fs-6"><i class="fas fa-exclamation-triangle"></i> تم رصد عيوب</span>
+                                        <div class="text-danger small mt-1">{{ result.get('defects_details') }}</div>
+                                    {% else %}
+                                        <span class="badge bg-success fs-6"><i class="fas fa-check-circle"></i> سليم (خالٍ من العيوب البصرية)</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            <tr>
+                                <th class="bg-light">12. الاستخدام والموسم الذكي</th>
+                                <td>الموسم: <strong>{{ result.get('suggested_season', 'كل المواسم') }}</strong> | الاستخدام المقترح: {{ result.get('recommended_usage', 'عام') }}</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="card shadow-sm border-primary">
+                <div class="card-body bg-light">
+                    <form method="POST" action="{{ url_for('inventory.save_product') }}">
+                        <div class="row align-items-center">
+                            <div class="col-md-7 mb-3 mb-md-0">
+                                <label for="name" class="form-label fw-bold">تأكيد اسم المنتج التجاري في المتجر:</label>
+                                <input type="text" class="form-control" id="name" name="name" placeholder="مثال: قماش موهير شتوي فاخر" required>
+                                
+                                <input type="hidden" name="image_name" value="{{ image_name }}">
+                                <input type="hidden" name="ai_analysis_json" value='{{ result | tojson }}'>
+                            </div>
+                            <div class="col-md-5 text-md-end">
+                                <button type="submit" class="btn btn-primary btn-lg w-100"><i class="fas fa-save"></i> اعتماد وحفظ في المتجر الذكي</button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>
+{% endblock %}

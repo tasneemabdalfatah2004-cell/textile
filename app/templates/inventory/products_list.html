@@ -1,20 +1,21 @@
 {% extends "base.html" %}
 
 {% block content %}
-<div class="card shadow-sm">
-    <div class="card-header bg-dark">
-        <h3 class="card-title">📦 Inventory Control (قائمة المنتجات)</h3>
+<div class="card shadow-sm mt-4">
+    <div class="card-header bg-dark d-flex justify-content-between align-items-center">
+        <h3 class="card-title text-white mb-0"><i class="fas fa-microscope"></i> AI Fabric Analysis Log (سجل الفحص الذكي)</h3>
     </div>
     <div class="card-body p-0">
-        <table class="table table-hover table-striped text-center mb-0">
-            <thead>
+        <table class="table table-hover table-striped text-center mb-0 align-middle">
+            <thead class="table-secondary">
                 <tr>
-                    <th>المعرف</th>
-                    <th>اسم المنتج</th>
-                    <th>نوع القماش (AI)</th>
-                    <th>السماكة (AI)</th>
-                    <th>الجودة (AI)</th>
-                    <th>الاستخدام المقترح (AI)</th>
+                    <th>ID</th>
+                    <th>Product Name</th>
+                    <th>Category</th>
+                    <th>Fabric Type (AI)</th>
+                    <th>Thickness (AI)</th>
+                    <th>Quality Index (AI)</th>
+                    <th>Suggested Usage (AI)</th>
                 </tr>
             </thead>
             <tbody>
@@ -23,18 +24,29 @@
                     <td>{{ product.id }}</td>
                     <td><strong>{{ product.name }}</strong></td>
                     
-                    {# التحقق من وجود بيانات تحليل الـ AI أولاً قبل العرض #}
-                    {% if product.ai_analysis %}
-                        <td><span class="badge badge-info">{{ product.ai_analysis.fabric_type }}</span></td>
-                        <td>{{ product.ai_analysis.thickness }}</td>
+                    <!-- Display Fabric Category -->
+                    <td>
+                        {% if product.category %}
+                            <span class="badge bg-secondary">{{ product.category.name }}</span>
+                        {% else %}
+                            <span class="text-muted small">Uncategorized</span>
+                        {% endif %}
+                    </td>
+                    
+                    <!-- Display 13 AI Smart Metrics from DB Columns directly -->
+                    {% if product.ai_overall_quality_index %}
+                        <td><span class="badge bg-info text-dark">{{ product.ai_fabric_type or 'Fabric' }}</span></td>
+                        <td>{{ product.ai_thickness or 'N/A' }}</td>
                         <td>
-                            <span class="badge badge-{% if product.ai_analysis.quality_score|int > 75 %}success{% else %}warning{% endif %}">
-                                {{ product.ai_analysis.quality_score }}%
+                            <span class="badge {% if product.ai_overall_quality_index|int >= 85 %}bg-success{% elif product.ai_overall_quality_index|int >= 60 %}bg-warning text-dark{% else %}bg-danger{% endif %} p-2">
+                                {{ product.ai_overall_quality_index }}%
                             </span>
                         </td>
-                        <td>{{ product.ai_analysis.recommended_usage }}</td>
+                        <td><small class="text-wrap">{{ product.ai_recommended_usage or 'General' }}</small></td>
                     {% else %}
-                        <td colspan="4" class="text-muted text-sm">لا تتوفر بيانات تحليل ذكي</td>
+                        <td colspan="4" class="text-muted small py-3">
+                            <i class="fas fa-robot text-secondary me-1"></i> No AI metrics available
+                        </td>
                     {% endif %}
                 </tr>
                 {% endfor %}
