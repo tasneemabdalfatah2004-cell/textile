@@ -51,6 +51,51 @@
             {% endif %}
 
             {% if current_user.is_authenticated %}
+                <!-- 🔔 جرس التنبيهات: طلبات معلقة + نقص كمية 🔔 -->
+                <li class="nav-item dropdown">
+                    <a class="nav-link" data-toggle="dropdown" href="#">
+                        <i class="far fa-bell"></i>
+                        {% if notif_total_count > 0 %}
+                        <span class="badge badge-danger navbar-badge">{{ notif_total_count }}</span>
+                        {% endif %}
+                    </a>
+                    <div class="dropdown-menu dropdown-menu-lg dropdown-menu-right" style="min-width: 320px;">
+                        <span class="dropdown-item dropdown-header">{{ notif_total_count }} تنبيه{{ 'ات' if notif_total_count != 1 else '' }}</span>
+
+                        {% if notif_pending_orders %}
+                            <div class="dropdown-divider"></div>
+                            <span class="dropdown-item-text text-muted small font-weight-bold px-3">
+                                <i class="fas fa-shopping-cart text-success mr-1"></i> طلبات بانتظار الموافقة
+                            </span>
+                            {% for order in notif_pending_orders %}
+                            <a href="{{ url_for('main.dashboard') }}" class="dropdown-item">
+                                <i class="fas fa-user text-muted mr-2"></i> طلب من {{ order.customer.name }}
+                            </a>
+                            {% endfor %}
+                        {% endif %}
+
+                        {% if notif_low_stock %}
+                            <div class="dropdown-divider"></div>
+                            <span class="dropdown-item-text text-muted small font-weight-bold px-3">
+                                <i class="fas fa-exclamation-triangle text-warning mr-1"></i> نقص بالكمية
+                            </span>
+                            {% for variant in notif_low_stock %}
+                            <a href="{{ url_for('inventory.list_products', filter='low_stock') }}" class="dropdown-item">
+                                <i class="fas fa-box text-muted mr-2"></i> {{ variant.product.name }} - {{ variant.color_name }}
+                                <span class="float-right text-danger font-weight-bold">{{ variant.quantity }}م</span>
+                            </a>
+                            {% endfor %}
+                        {% endif %}
+
+                        {% if notif_total_count == 0 %}
+                            <span class="dropdown-item text-muted text-center py-3">ما في تنبيهات حالياً ✅</span>
+                        {% else %}
+                            <div class="dropdown-divider"></div>
+                            <a href="{{ url_for('main.dashboard') }}" class="dropdown-item dropdown-footer text-center">عرض الكل بالداشبورد</a>
+                        {% endif %}
+                    </div>
+                </li>
+
                 <li class="nav-item">
                     <a href="{{ url_for('auth.logout') }}" class="nav-link text-danger"><i class="fas fa-sign-out-alt"></i> Logout</a>
                 </li>
@@ -152,12 +197,10 @@
 
 <script>
 $(document).ready(function() {
-    // Open active cart session from URL trigger parameters
     if(window.location.search.includes('cart_open')) {
         $('#cartModal').modal('show');
     }
 
-    // Unified script handling trigger for specific custom modals
     $('.open-modal-btn').click(function() {
         var target = $(this).data('target');
         $(target).modal('show');

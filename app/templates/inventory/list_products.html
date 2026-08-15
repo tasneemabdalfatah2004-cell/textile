@@ -1,162 +1,119 @@
 {% extends "base.html" %}
 
 {% block content %}
-<div class="container mt-4" dir="ltr">
 
-    <div class="d-flex justify-content-between align-items-center mb-4 border-bottom pb-3">
-        <div>
-            <h1 class="fw-bold">
-                <i class="fas fa-boxes text-success"></i> 
-                {{ "Stock Alerts" if filter_type == 'low_stock' else "Inventory Control" }}
-            </h1>
-            <p class="text-muted">Manage fabrics, stock, and pricing</p>
-        </div>
-        <div class="d-flex gap-2">
-            <input type="text" id="searchInput" class="form-control rounded-pill" placeholder="Search fabric name..." onkeyup="filterTable()">
-            {% if filter_type == 'low_stock' %}
-                <a href="{{ url_for('inventory.list_products') }}" class="btn btn-secondary btn-lg rounded-pill px-4">Show All</a>
-            {% endif %}
-            <a href="{{ url_for('inventory.add_product') }}" class="btn btn-success btn-lg rounded-pill px-4">
-                <i class="fas fa-plus"></i> Add
-            </a>
-        </div>
-    </div>
-
-    {% if filter_type == 'low_stock' %}
-    <div class="alert alert-warning shadow-sm border-0 mb-4">
-        <i class="fas fa-exclamation-triangle"></i> <strong>Notice:</strong> Showing only fabrics with stock below 10 meters.
-    </div>
-    {% endif %}
-
-    <div class="card shadow-sm border-0">
-        <div class="table-responsive">
-            <table class="table table-hover text-center align-middle mb-0" id="productTable">
-                <thead class="table-dark">
-                    <tr>
-                        <th>Image</th>
-                        <th>Fabric Specifications</th>
-                        <th>Cost</th>
-                        <th>Sell</th>
-                        <th class="text-start">Patterns & Stock</th>
-                        <th>Total Stock</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                {% for product in products %}
-                <tr>
-                    <!-- 1. Fabric Image -->
-                    <td>
-                        <img src="{{ url_for('static', filename='uploads/' + (product.image_file or 'default.jpg')) }}"
-                             style="width:60px;height:60px;object-fit:cover;border-radius:8px;">
-                    </td>
-                    
-                    <!-- 2. Fabric Specifications (Name + Category + AI Analysis) -->
-                    <td class="text-start">
-                        <div class="fw-bold text-dark fs-5 mb-1">{{ product.name }}</div>
-                        
-                        <!-- Category Badge -->
-                        <div class="mb-2">
-                            {% if product.category %}
-                                <span class="badge bg-secondary"><i class="fas fa-folder me-1"></i>{{ product.category.name }}</span>
-                            {% else %}
-                                <span class="badge bg-light text-muted">Uncategorized</span>
-                            {% endif %}
-                        </div>
-
-                        <!-- AI Smart Overview -->
-                        {% if product.ai_overall_quality_index %}
-                        <div class="d-flex flex-wrap gap-1 align-items-center">
-                            <span class="badge bg-info text-dark small"><i class="fas fa-robot me-1"></i> {{ product.ai_fabric_type or 'Fabric' }}</span>
-                            <span class="badge {% if product.ai_overall_quality_index|int >= 85 %}bg-success{% elif product.ai_overall_quality_index|int >= 60 %}bg-warning text-dark{% else %}bg-danger{% endif %} small">
-                                Quality: {{ product.ai_overall_quality_index }}%
-                            </span>
-                            {% if product.ai_defects_detected %}
-                                <span class="badge bg-danger small" title="{{ product.ai_defects_details }}"><i class="fas fa-exclamation-circle"></i> Defects</span>
-                            {% else %}
-                            <span class="badge bg-light text-success border border-success small"><i class="fas fa-check-circle"></i> Passed</span>
-                            {% endif %}
-                        </div>
-                        {% else %}
-                        <small class="text-muted"><i class="fas fa-robot text-secondary"></i> No AI data</small>
-                        {% endif %}
-                    </td>
-                    
-                    <!-- 3. Cost Price -->
-                    <td class="text-secondary">${{ "%.2f"|format(product.cost_price_per_meter) }}</td>
-                    
-                    <!-- 4. Selling Price -->
-                    <td class="fw-bold text-success">${{ "%.2f"|format(product.selling_price) }}</td>
-                    
-                    <!-- 5. Patterns and Stock -->
-                    <td class="text-start">
-                        {% set variants_to_show = product.variants|selectattr("quantity", "lessthan", 11)|list if filter_type == 'low_stock' else product.variants %}
-                        {% for v in variants_to_show %}
-                        <div class="d-flex align-items-center mb-2">
-                            {% if v.image_filename %}
-                                <img src="{{ url_for('static', filename='uploads/' + v.image_filename) }}" 
-                                     style="width:40px; height:40px; border-radius:50%; object-fit:cover; margin-right:10px; border:1px solid #ccc;">
-                            {% else %}
-                                <span style="background-color: {{ v.color_code or '#ccc' }}; width: 40px; height: 40px; border-radius: 50%; display: inline-block; margin-right: 10px; border: 1px solid #ccc;"></span>
-                            {% endif %}
-                            <div>
-                                <div class="small fw-bold">{{ v.color_name }}</div>
-                                <div class="small {{ 'text-danger fw-bold' if v.quantity <= 10 else 'text-muted' }}">
-                                    {{ v.quantity }} m
-                                </div>
-                            </div>
-                        </div>
-                        {% endfor %}
-                    </td>
-                    
-                    <!-- 6. Total Stock -->
-                    <td class="fw-bold">
-                        {% set total_qty = product.variants|sum(attribute='quantity') %}
-                        <span class="{{ 'text-danger' if total_qty <= 15 else 'text-dark' }}">
-                            {{ total_qty }} m
-                        </span>
-                    </td>
-                    
-                    <!-- 7. Actions (Edit / Archive) -->
-                    <td>
-                        <div class="d-flex gap-1 justify-content-center">
-                            <a href="{{ url_for('inventory.edit_product', id=product.id) }}" class="btn btn-sm btn-outline-primary rounded-pill px-3">
-                                <i class="fas fa-edit"></i> Edit
-                            </a>
-                            <form action="{{ url_for('inventory.toggle_archive', id=product.id) }}" method="POST" style="display:inline;">
-                                <button type="submit" class="btn btn-sm {% if product.is_active %}btn-outline-danger{% else %}btn-outline-success{% endif %} rounded-pill px-3">
-                                    <i class="fas {% if product.is_active %}fa-archive{% else %}fa-box-open{% endif %}"></i> 
-                                    {{ "Archive" if product.is_active else "Restore" }}
-                                </button>
-                            </form>
-                        </div>
-                    </td>
-                </tr>
-                {% endfor %}
-                </tbody>
-            </table>
+<div class="content-header">
+    <div class="container-fluid">
+        <div class="row mb-2 align-items-center">
+            <div class="col-sm-8">
+                <h1 class="m-0"><i class="fas fa-boxes mr-2 text-primary"></i>Inventory Control</h1>
+                <p class="text-muted mb-0">إدارة الأقمشة، الديزانات، والكميات</p>
+            </div>
+            <div class="col-sm-4 text-sm-right">
+                {% if filter_type == 'low_stock' %}
+                    <span class="badge badge-warning p-2">
+                        <i class="fas fa-exclamation-triangle mr-1"></i> عرض الأقمشة قليلة الكمية فقط
+                    </span>
+                    <a href="{{ url_for('inventory.list_products') }}" class="btn btn-sm btn-outline-secondary ml-1">إلغاء الفلتر</a>
+                {% endif %}
+            </div>
         </div>
     </div>
 </div>
 
-<script>
-function filterTable() {
-    const input = document.getElementById("searchInput");
-    const filter = input.value.toUpperCase();
-    const table = document.getElementById("productTable");
-    const tr = table.getElementsByTagName("tr");
+<section class="content">
+    <div class="container-fluid">
+        <div class="card shadow-sm">
+            <div class="card-header">
+                <h3 class="card-title"><i class="fas fa-layer-group mr-1 text-primary"></i> قائمة الأقمشة</h3>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover table-striped text-center mb-0 align-middle">
+                        <thead class="thead-light">
+                            <tr>
+                                <th>ID</th>
+                                <th>اسم المنتج</th>
+                                <th>الصنف</th>
+                                <th>الحالة</th>
+                                <th>الديزانات والكمية</th>
+                                <th>إجراءات</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for product in products %}
+                            <tr>
+                                <td>{{ product.id }}</td>
+                                <td><strong>{{ product.name }}</strong></td>
 
-    for (let i = 1; i < tr.length; i++) {
-        let td = tr[i].getElementsByTagName("td")[1]; // الفحص في عمود البيانات الأساسية الثاني
-        if (td) {
-            let txtValue = td.textContent || td.innerText;
-            if (txtValue.toUpperCase().indexOf(filter) > -1) {
-                tr[i].style.display = "";
-            } else {
-                tr[i].style.display = "none";
-            }
-        }
-    }
-}
-</script>
+                                <td>
+                                    {% if product.category %}
+                                        <span class="badge badge-secondary">{{ product.category.name }}</span>
+                                    {% else %}
+                                        <span class="text-muted small">بدون صنف</span>
+                                    {% endif %}
+                                </td>
+
+                                <td>
+                                    {% if product.is_active %}
+                                        <span class="badge badge-primary">منشور</span>
+                                    {% else %}
+                                        <span class="badge badge-light border">مسودة</span>
+                                    {% endif %}
+                                </td>
+
+                                <!-- 🌟 عمود الديزانات والكميات 🌟 -->
+                                <td style="min-width: 220px;">
+                                    {% if product.variants %}
+                                        <div class="d-flex justify-content-center flex-wrap" style="gap: 6px;">
+                                            {% for variant in product.variants %}
+                                            <div class="text-center" style="width: 55px;" title="{{ variant.color_name }}">
+                                                {% if variant.image_filename %}
+                                                    <img src="{{ url_for('static', filename='uploads/' + variant.image_filename) }}"
+                                                         width="40" height="40"
+                                                         style="border-radius:50%; object-fit:cover; border:2px solid #dee2e6;">
+                                                {% else %}
+                                                    <div style="width:40px; height:40px; border-radius:50%; background:#f8f9fa; border:2px solid #dee2e6; margin: 0 auto; display:flex; align-items:center; justify-content:center; font-size:11px;">?</div>
+                                                {% endif %}
+                                                <span class="d-block small mt-1 {% if variant.quantity <= 10 %}text-danger font-weight-bold{% else %}text-muted{% endif %}">
+                                                    {{ variant.quantity }}م
+                                                </span>
+                                            </div>
+                                            {% endfor %}
+                                        </div>
+                                    {% else %}
+                                        <span class="text-muted small"><i class="fas fa-exclamation-circle"></i> لا يوجد ديزانات بعد</span>
+                                    {% endif %}
+                                </td>
+
+                                <!-- 🌟 الأزرار الثلاثة جنب بعض: تعديل / AI / أرشفة 🌟 -->
+                                <td style="min-width: 220px;">
+                                    <div class="btn-group" role="group">
+                                        <a href="{{ url_for('inventory.edit_product', id=product.id) }}" class="btn btn-sm btn-outline-primary" title="تعديل">
+                                            <i class="fas fa-edit"></i>
+                                        </a>
+                                        <a href="{{ url_for('inventory.view_ai_report', id=product.id) }}" class="btn btn-sm btn-outline-info" title="تقرير الذكاء الاصطناعي">
+                                            <i class="fas fa-robot"></i> AI
+                                        </a>
+                                        <form action="{{ url_for('inventory.toggle_archive', id=product.id) }}" method="POST" class="d-inline"
+                                              onclick="return confirm('{{ 'إخفاء المنتج عن الزبون؟' if product.is_active else 'نشر المنتج ليظهر عند الزبون؟' }}');">
+                                            <button type="submit" class="btn btn-sm {{ 'btn-outline-warning' if product.is_active else 'btn-outline-success' }}" title="{{ 'أرشفة' if product.is_active else 'نشر' }}">
+                                                <i class="fas {{ 'fa-box-archive' if product.is_active else 'fa-check-circle' }}"></i>
+                                            </button>
+                                        </form>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="6" class="text-muted text-center py-5">لا يوجد منتجات لعرضها حالياً</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
 {% endblock %}

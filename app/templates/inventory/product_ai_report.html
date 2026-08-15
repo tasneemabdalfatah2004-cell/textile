@@ -3,10 +3,15 @@
 
 <div class="content-header">
     <div class="container-fluid">
-        <div class="row mb-2">
-            <div class="col-12 text-center">
-                <h1 class="m-0"><i class="fas fa-robot mr-2 text-primary"></i>تقرير التحليل الذكي للقماش (AI Analysis)</h1>
-                <p class="text-muted mb-0">تم استخراج الخصائص البصرية والفيزيائية والنسيجية من الصورة بنجاح</p>
+        <div class="row mb-2 align-items-center">
+            <div class="col-sm-8">
+                <h1 class="m-0"><i class="fas fa-robot mr-2 text-primary"></i>تقرير الذكاء الاصطناعي — {{ product.name }}</h1>
+                <p class="text-muted mb-0">الخصائص البصرية والفيزيائية والنسيجية المحفوظة لهاد المنتج</p>
+            </div>
+            <div class="col-sm-4 text-sm-right">
+                <a href="{{ url_for('inventory.list_products') }}" class="btn btn-outline-secondary">
+                    <i class="fas fa-arrow-right mr-1"></i> رجوع لقائمة المخزون
+                </a>
             </div>
         </div>
     </div>
@@ -18,14 +23,14 @@
             <div class="col-md-4 mb-4">
                 <div class="card card-outline card-primary shadow-sm sticky-top" style="top: 20px;">
                     <div class="card-header">
-                        <h3 class="card-title">العينة المرفوعة</h3>
+                        <h3 class="card-title">صورة العينة</h3>
                     </div>
                     <div class="card-body p-2 text-center">
                         <div class="position-relative d-inline-block">
-                            <img src="{{ url_for('static', filename='uploads/' + image_name) }}"
-                                 class="img-fluid rounded" alt="Fabric Image" style="max-height: 350px; object-fit: cover;">
-                            {% if result.get('defects_detected') %}
-                                {% for spot in result.get('defect_locations', []) %}
+                            <img src="{{ url_for('static', filename='uploads/' + product.image_file) }}"
+                                 class="img-fluid rounded" alt="{{ product.name }}" style="max-height: 350px; object-fit: cover;">
+                            {% if product.ai_defects_detected and product.ai_analysis %}
+                                {% for spot in product.ai_analysis.get('defect_locations', []) %}
                                 <span class="defect-marker" style="left: {{ spot.x }}%; top: {{ spot.y }}%;" title="عيب مكتشف"></span>
                                 {% endfor %}
                             {% endif %}
@@ -35,6 +40,12 @@
             </div>
 
             <div class="col-md-8">
+                {% if not product.ai_fabric_type %}
+                <div class="alert alert-warning">
+                    <i class="fas fa-exclamation-triangle mr-1"></i> ما في تحليل ذكاء اصطناعي محفوظ لهاد المنتج (تمت إضافته يدوياً بدون تحليل صورة).
+                </div>
+                {% else %}
+
                 <!-- Quality Index + Estimated Price -->
                 <div class="row">
                     <div class="col-md-7 mb-4">
@@ -46,7 +57,7 @@
                                 </div>
                                 <div class="bg-success text-white p-3 rounded-circle text-center shadow flex-shrink-0 ml-3"
                                      style="width: 70px; height: 70px; display: flex; align-items: center; justify-content: center;">
-                                    <h4 class="mb-0 font-weight-bold">{{ result.get('overall_quality_index', 100) }}%</h4>
+                                    <h4 class="mb-0 font-weight-bold">{{ product.ai_overall_quality_index or 0 }}%</h4>
                                 </div>
                             </div>
                         </div>
@@ -55,8 +66,7 @@
                         <div class="card card-outline card-warning shadow-sm h-100">
                             <div class="card-body text-center">
                                 <h5 class="text-warning mb-1"><i class="fas fa-dollar-sign mr-1"></i> السعر التقديري للمتر</h5>
-                                <h4 class="font-weight-bold mb-0">{{ result.get('estimated_price_per_meter', 'غير متوفر') }}</h4>
-                                <small class="text-muted"><i class="fas fa-info-circle mr-1"></i>تقدير عام من الذكاء الاصطناعي بناءً على أسعار السوق</small>
+                                <h4 class="font-weight-bold mb-0">{{ product.ai_estimated_price_per_meter or 'غير متوفر' }}</h4>
                             </div>
                         </div>
                     </div>
@@ -72,46 +82,46 @@
                             <tbody>
                                 <tr>
                                     <th style="width: 35%;" class="bg-light">1. نوع القماش المتوقع</th>
-                                    <td><span class="badge badge-primary p-2">{{ result.get('fabric_type', 'غير محدد') }}</span></td>
+                                    <td><span class="badge badge-primary p-2">{{ product.ai_fabric_type or 'غير محدد' }}</span></td>
                                 </tr>
                                 <tr>
                                     <th class="bg-light">2. تحليل السماكة الكثافية</th>
-                                    <td>{{ result.get('thickness', 'غير محدد') }}</td>
+                                    <td>{{ product.ai_thickness or 'غير محدد' }}</td>
                                 </tr>
                                 <tr>
                                     <th class="bg-light">3. كثافة وتداخل الخيوط</th>
-                                    <td>{{ result.get('weaving_density', 'غير محدد') }}</td>
+                                    <td>{{ product.ai_weaving_density or 'غير محدد' }}</td>
                                 </tr>
                                 <tr>
                                     <th class="bg-light">4. تقييم جودة وبنية النسج</th>
-                                    <td>{{ result.get('weaving_quality_score', '0') }}% انتظام بنيوي</td>
+                                    <td>{{ product.ai_weaving_quality_score or 0 }}% انتظام بنيوي</td>
                                 </tr>
                                 <tr>
                                     <th class="bg-light">5 & 10. النمط والزخارف الدقيقة</th>
-                                    <td>{{ result.get('pattern_style', 'غير محدد') }}</td>
+                                    <td>{{ product.ai_pattern_style or 'غير محدد' }}</td>
                                 </tr>
                                 <tr>
                                     <th class="bg-light">6. الملمس واتجاه الألياف</th>
-                                    <td>{{ result.get('texture_feel', 'غير محدد') }} (الاتجاه: {{ result.get('fiber_direction', 'طولي') }})</td>
+                                    <td>{{ product.ai_texture_feel or 'غير محدد' }} (الاتجاه: {{ product.ai_fiber_direction or 'طولي' }})</td>
                                 </tr>
                                 <tr>
                                     <th class="bg-light">7. دراسة الوبرة السطحية</th>
-                                    <td>{{ result.get('pile_analysis', 'لا يوجد وبرة') }}</td>
+                                    <td>{{ product.ai_pile_analysis or 'لا يوجد وبرة' }}</td>
                                 </tr>
                                 <tr>
                                     <th class="bg-light">8. التضاريس وانعكاس الضوء</th>
-                                    <td>{{ result.get('light_reflection', 'مطفي') }}</td>
+                                    <td>{{ product.ai_light_reflection or 'مطفي' }}</td>
                                 </tr>
                                 <tr>
                                     <th class="bg-light">9. جودة الحواف والتشطيب النهائي</th>
-                                    <td>{{ result.get('finishing_quality', 'غير محدد') }}</td>
+                                    <td>{{ product.ai_finishing_quality or 'غير محدد' }}</td>
                                 </tr>
                                 <tr>
                                     <th class="bg-light">11. نظام كشف العيوب التلقائي</th>
                                     <td>
-                                        {% if result.get('defects_detected') %}
+                                        {% if product.ai_defects_detected %}
                                             <span class="badge badge-danger p-2"><i class="fas fa-exclamation-triangle"></i> تم رصد عيوب</span>
-                                            <div class="text-danger small mt-1">{{ result.get('defects_details') }}</div>
+                                            <div class="text-danger small mt-1">{{ product.ai_defects_details }}</div>
                                         {% else %}
                                             <span class="badge badge-success p-2"><i class="fas fa-check-circle"></i> سليم (خالٍ من العيوب البصرية)</span>
                                         {% endif %}
@@ -119,42 +129,13 @@
                                 </tr>
                                 <tr>
                                     <th class="bg-light">12. الاستخدام والموسم الذكي</th>
-                                    <td>الموسم: <strong>{{ result.get('suggested_season', 'كل المواسم') }}</strong> | الاستخدام المقترح: {{ result.get('recommended_usage', 'عام') }}</td>
+                                    <td>الموسم: <strong>{{ product.ai_suggested_season or 'كل المواسم' }}</strong> | الاستخدام المقترح: {{ product.ai_recommended_usage or 'عام' }}</td>
                                 </tr>
                             </tbody>
                         </table>
                     </div>
                 </div>
-
-                <!-- Save as Draft -->
-                <div class="card card-outline card-primary shadow-sm">
-                    <div class="card-header">
-                        <h3 class="card-title"><i class="fas fa-save mr-1"></i> حفظ العينة</h3>
-                    </div>
-                    <div class="card-body">
-                        <form method="POST" action="{{ url_for('inventory.save_product') }}">
-                            <div class="row align-items-end">
-                                <div class="col-md-7 mb-3 mb-md-0">
-                                    <div class="form-group mb-0">
-                                        <label for="name" class="font-weight-bold">تأكيد اسم المنتج التجاري في المتجر:</label>
-                                        <input type="text" class="form-control" id="name" name="name" placeholder="مثال: قماش موهير شتوي فاخر" required>
-                                    </div>
-                                    <input type="hidden" name="image_name" value="{{ image_name }}">
-                                    <input type="hidden" name="ai_analysis_json" value='{{ result | tojson }}'>
-                                </div>
-                                <div class="col-md-5 text-md-right">
-                                    <button type="submit" class="btn btn-primary btn-lg w-100">
-                                        <i class="fas fa-save mr-1"></i> حفظ كمسودة ومتابعة الإعداد
-                                    </button>
-                                </div>
-                            </div>
-                            <small class="text-muted d-block mt-2">
-                                <i class="fas fa-info-circle mr-1"></i> رح يتحفظ القماش كمسودة غير ظاهرة للزبون، وبتنطري مباشرة لصفحة إضافة السعر والكمية والصنف.
-                            </small>
-                        </form>
-                    </div>
-                </div>
-
+                {% endif %}
             </div>
         </div>
     </div>

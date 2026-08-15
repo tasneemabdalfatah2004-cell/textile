@@ -1,94 +1,238 @@
 {% extends "base.html" %}
 {% block content %}
-<div class="container mt-5">
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <div>
-            <h2 class="fw-bold text-dark mb-0">{{ product.name }}</h2>
-            <p class="text-muted">Manage stock, prices, category, and fabric designs</p>
-        </div>
-        <div class="text-end">
-            <span class="badge bg-success fs-6 p-2 shadow-sm rounded-pill px-3">
-                <i class="fas fa-tag me-1"></i> Selling: ${{ "%.2f"|format(product.selling_price) }}
-            </span>
+
+<div class="content-header">
+    <div class="container-fluid">
+        <div class="row mb-2 align-items-center">
+            <div class="col-sm-6">
+                <h1 class="m-0"><i class="fas fa-edit mr-2 text-primary"></i>{{ product.name }}</h1>
+                <p class="text-muted mb-0">إدارة المخزون والأسعار والصنف وديزانات القماش</p>
+            </div>
+            <div class="col-sm-6 text-sm-right">
+                <span class="badge badge-success p-2 mr-1">
+                    <i class="fas fa-tag mr-1"></i> السعر: ${{ "%.2f"|format(product.selling_price) }}
+                </span>
+                {% if product.is_active %}
+                    <span class="badge badge-primary p-2">
+                        <i class="fas fa-check-circle mr-1"></i> منشور للزبون
+                    </span>
+                {% else %}
+                    <span class="badge badge-secondary p-2">
+                        <i class="fas fa-eye-slash mr-1"></i> مسودة (غير ظاهر)
+                    </span>
+                {% endif %}
+            </div>
         </div>
     </div>
+</div>
 
-    <form action="{{ url_for('inventory.edit_product', id=product.id) }}" method="POST" enctype="multipart/form-data">
-        
-        <!-- 🌟 New Category Selection Card 🌟 -->
-        <div class="card mb-4 border-0 shadow-sm rounded-4 p-4">
-            <div class="row align-items-center">
-                <div class="col-md-12">
-                    <label class="text-muted small fw-bold mb-2"><i class="fas fa-folder text-success me-1"></i> FABRIC CATEGORY</label>
-                    <select class="form-select form-select-lg border-0 bg-light" id="category_id" name="category_id" required style="border-radius: 0.8rem;">
-                        <option value="">-- Select Category --</option>
-                        {% for category in categories %}
-                            <option value="{{ category.id }}" {% if category.id == product.category_id %}selected{% endif %}>
-                                {{ category.name }}
-                            </option>
-                        {% endfor %}
-                    </select>
-                </div>
-            </div>
-        </div>
+<section class="content">
+    <div class="container-fluid">
+        <form id="edit-form" action="{{ url_for('inventory.edit_product', id=product.id) }}" method="POST" enctype="multipart/form-data">
 
-        <!-- Prices Card -->
-        <div class="card mb-4 border-0 shadow-sm rounded-4 p-3">
-            <div class="row align-items-center">
-                <div class="col-md-6">
-                    <label class="text-muted small fw-bold mb-1">SELLING PRICE ($)</label>
-                    <input type="number" step="0.01" name="selling_price" value="{{ product.selling_price }}" class="form-control form-control-lg border-0 bg-light">
+            <!-- Category Card -->
+            <div class="card card-outline card-success shadow-sm">
+                <div class="card-header">
+                    <h3 class="card-title"><i class="fas fa-folder-open mr-1 text-success"></i> صنف القماش</h3>
                 </div>
-                <div class="col-md-6">
-                    <label class="text-muted small fw-bold mb-1">COST PRICE ($)</label>
-                    <input type="number" step="0.01" name="cost_price_per_meter" value="{{ product.cost_price_per_meter }}" class="form-control form-control-lg border-0 bg-light">
-                </div>
-            </div>
-        </div>
-
-        <h5 class="mb-3"><i class="fas fa-layer-group text-primary me-2"></i> Current Designs Inventory</h5>
-        <div class="row row-cols-1 row-cols-md-4 g-4 mb-5">
-            {% for variant in product.variants %}
-            <div class="col">
-                <div class="card h-100 border-0 shadow-sm rounded-4 overflow-hidden">
-                    <img src="{{ url_for('static', filename='uploads/' + (variant.image_filename or 'default.jpg')) }}" class="card-img-top" style="height: 180px; object-fit: cover;">
-                    <div class="card-body bg-light">
-                        <label class="small text-muted mb-1">Meters in stock</label>
-                        <input type="number" name="qty_variant_{{ variant.id }}" value="{{ variant.quantity }}" class="form-control shadow-none">
+                <div class="card-body">
+                    <div class="form-group mb-0">
+                        <select class="form-control" id="category_id" name="category_id" required>
+                            <option value="">-- اختر الصنف --</option>
+                            {% for category in categories %}
+                                <option value="{{ category.id }}" {% if category.id == product.category_id %}selected{% endif %}>
+                                    {{ category.name }}
+                                </option>
+                            {% endfor %}
+                        </select>
                     </div>
                 </div>
             </div>
-            {% endfor %}
-        </div>
 
-        <div class="card border-0 shadow-sm rounded-4 p-4 mb-5" style="background-color: #212529; color: white;">
-            <h5 class="mb-3"><i class="fas fa-plus-circle text-warning me-2"></i> Add New Design to Fabric</h5>
-            <div class="row align-items-end">
-                <div class="col-md-3">
-                   <label class="small text-light mb-1">Design Name</label>
-                   <input type="text" name="new_variant_name" class="form-control bg-dark text-white border-secondary" placeholder="e.g. Flower Silk">
+            <!-- 🌟 Main Display Image (منفصلة عن صورة التحليل القريبة) 🌟 -->
+            <div class="card card-outline card-secondary shadow-sm">
+                <div class="card-header">
+                    <h3 class="card-title"><i class="fas fa-image mr-1 text-secondary"></i> الصورة الرئيسية بالمتجر</h3>
                 </div>
-                <div class="col-md-6">
-                    <label class="small text-light mb-1">Upload Design Image</label>
-                    <input type="file" name="new_variant_image" class="form-control bg-dark text-white border-secondary">
-                </div>
-
-                <div class="col-md-3">
-                    <label class="small text-light mb-1">Initial Quantity</label>
-                    <input type="number" name="new_variant_qty" class="form-control bg-dark text-white border-secondary" placeholder="0.0">
-                </div>
-                <div class="col-md-3">
-                    <button type="submit" class="btn btn-primary w-100 py-2 rounded-pill shadow">
-                        <i class="fas fa-save me-1"></i> Commit Changes
-                    </button>
+                <div class="card-body">
+                    <div class="row align-items-center">
+                        <div class="col-md-3 text-center mb-3 mb-md-0">
+                            <img src="{{ url_for('static', filename='uploads/' + product.image_file) }}"
+                                 class="img-fluid rounded border" style="max-height: 120px; object-fit: cover;">
+                            <p class="text-muted small mb-0 mt-1">الحالية</p>
+                        </div>
+                        <div class="col-md-9">
+                            <div class="form-group mb-0">
+                                <label class="text-muted text-sm">استبدال الصورة الرئيسية (اختياري)</label>
+                                <div class="custom-file">
+                                    <input type="file" name="main_display_image" class="custom-file-input" id="main_display_image" accept="image/*">
+                                    <label class="custom-file-label" for="main_display_image">اختاري صورة أوضح/أبعد للقماش...</label>
+                                </div>
+                                <small class="text-muted d-block mt-1">
+                                    <i class="fas fa-info-circle mr-1"></i> هاي الصورة يلي بتظهر بالمتجر وقائمة المخزون — منفصلة عن صورة التحليل القريبة، ما بتأثر على نتائج الذكاء الاصطناعي المحفوظة.
+                                </small>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
-        </div>
-    </form>
-</div>
 
-<style>
-    .rounded-4 { border-radius: 1.5rem !important; }
-    .form-control:focus, .form-select:focus { box-shadow: none; border: 2px solid #0d6efd !important; }
-</style>
+            <!-- Prices Card -->
+            <div class="card card-outline card-info shadow-sm">
+                <div class="card-header">
+                    <h3 class="card-title"><i class="fas fa-dollar-sign mr-1 text-info"></i> الأسعار</h3>
+                </div>
+                <div class="card-body">
+                    {% if product.ai_estimated_price_per_meter %}
+                    <div class="alert alert-warning py-2 mb-3">
+                        <i class="fas fa-robot mr-1"></i>
+                        تقدير الذكاء الاصطناعي لسعر السوق: <strong>{{ product.ai_estimated_price_per_meter }}</strong>
+                    </div>
+                    {% endif %}
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label class="text-muted text-sm">سعر البيع ($)</label>
+                                <input type="number" step="0.01" name="selling_price" value="{{ product.selling_price }}" class="form-control">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label class="text-muted text-sm">سعر التكلفة للمتر ($)</label>
+                                <input type="number" step="0.01" name="cost_price_per_meter" value="{{ product.cost_price_per_meter }}" class="form-control">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Current Designs -->
+            <div class="card card-outline card-primary shadow-sm">
+                <div class="card-header">
+                    <h3 class="card-title"><i class="fas fa-layer-group mr-1 text-primary"></i> الديزانات الحالية بالمخزون</h3>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        {% for variant in product.variants %}
+                        <div class="col-md-3 col-sm-6 mb-3">
+                            <div class="card card-widget widget-user-2 shadow-sm">
+                                <img src="{{ url_for('static', filename='uploads/' + (variant.image_filename or 'default.jpg')) }}"
+                                     class="card-img-top" style="height: 160px; object-fit: cover;">
+                                <div class="card-footer p-2">
+                                    <p class="text-muted small mb-1">{{ variant.color_name }}</p>
+                                    <label class="text-muted text-xs mb-1">الكمية بالمتر</label>
+                                    <input type="number" name="qty_variant_{{ variant.id }}" value="{{ variant.quantity }}" class="form-control form-control-sm">
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Add New Design -->
+            <div class="card card-outline card-warning shadow-sm">
+                <div class="card-header">
+                    <h3 class="card-title"><i class="fas fa-plus-circle mr-1 text-warning"></i> إضافة ديزان جديد للقماش</h3>
+                </div>
+                <div class="card-body">
+                    <div class="row align-items-end">
+                        <div class="col-md-3">
+                            <div class="form-group">
+                                <label class="text-muted text-sm">اسم الديزان</label>
+                                <input type="text" name="new_variant_name" class="form-control" placeholder="مثال: أزهار حرير">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label class="text-muted text-sm">صورة الديزان</label>
+                                <div class="custom-file">
+                                    <input type="file" name="new_variant_image" class="custom-file-input" id="new_variant_image">
+                                    <label class="custom-file-label" for="new_variant_image">اختاري صورة...</label>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="form-group">
+                                <label class="text-muted text-sm">الكمية الابتدائية</label>
+                                <input type="number" name="new_variant_qty" class="form-control" placeholder="0.0">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 🌟 Source / Supplier Info 🌟 -->
+            <div class="card card-outline card-info shadow-sm">
+                <div class="card-header">
+                    <h3 class="card-title"><i class="fas fa-handshake mr-1 text-info"></i> إضافة سجل مصدر / مورد</h3>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-4">
+                            <div class="form-group">
+                                <label class="text-muted text-sm">اسم المورد</label>
+                                <input type="text" name="partner_name" class="form-control" placeholder="مثال: مصنع الأمل">
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="form-group">
+                                <label class="text-muted text-sm">الكمية الموردة (متر)</label>
+                                <input type="number" step="0.1" name="source_quantity" class="form-control" placeholder="0.0">
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="form-group">
+                                <label class="text-muted text-sm">سعر الشراء (الدفعة)</label>
+                                <input type="number" step="0.01" name="source_cost_price" class="form-control" placeholder="0.00">
+                            </div>
+                        </div>
+                        <div class="col-md-12">
+                            <div class="form-group mb-0">
+                                <label class="text-muted text-sm">ملاحظات (اختياري)</label>
+                                <input type="text" name="source_notes" class="form-control" placeholder="أي تفاصيل إضافية عن الدفعة">
+                            </div>
+                        </div>
+                    </div>
+                    <small class="text-muted d-block mt-2">
+                        <i class="fas fa-info-circle mr-1"></i> عبّي اسم المورد بس إذا بدك تسجّلي دفعة شراء جديدة — إذا خليتيه فاضي ما رح ينضاف سجل.
+                    </small>
+                </div>
+            </div>
+
+            <!-- Actions -->
+            <div class="card shadow-sm">
+                <div class="card-footer d-flex justify-content-between bg-light">
+                    <button type="submit" class="btn btn-primary btn-lg px-4">
+                        <i class="fas fa-save mr-1"></i> حفظ التعديلات
+                    </button>
+
+                    {% if product.is_active %}
+                        <button type="submit" formaction="{{ url_for('inventory.toggle_archive', id=product.id) }}"
+                                formnovalidate class="btn btn-warning btn-lg px-4"
+                                onclick="return confirm('إخفاء المنتج عن الزبون؟');">
+                            <i class="fas fa-eye-slash mr-1"></i> إخفاء عن الزبون
+                        </button>
+                    {% else %}
+                        <button type="submit" formaction="{{ url_for('inventory.toggle_archive', id=product.id) }}"
+                                formnovalidate class="btn btn-success btn-lg px-4"
+                                onclick="return confirm('نشر المنتج ليظهر عند الزبون الآن؟');">
+                            <i class="fas fa-check-circle mr-1"></i> نشر للزبون الآن
+                        </button>
+                    {% endif %}
+                </div>
+            </div>
+
+        </form>
+    </div>
+</section>
+
+<script>
+$(document).ready(function() {
+    $('.custom-file-input').on('change', function() {
+        var fileName = $(this).val().split('\\').pop();
+        $(this).siblings('.custom-file-label').addClass('selected').html(fileName || 'اختاري صورة...');
+    });
+});
+</script>
 {% endblock %}

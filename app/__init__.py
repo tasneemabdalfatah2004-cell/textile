@@ -38,6 +38,28 @@ def create_app():
     app.register_blueprint(inventory_bp)
     app.register_blueprint(main_bp)
 
+    # 🔔 context_processor: يوصل عدد التنبيهات (طلبات معلقة + نقص كمية) لكل صفحة بالموقع
+    # عشان الجرس بـ base.html يقدر يعرضهم بأي مكان بدون ما نمررهم يدوياً من كل route
+    @app.context_processor
+    def inject_notifications():
+        from flask_login import current_user
+        if not current_user.is_authenticated:
+            return dict(notif_pending_orders=[], notif_low_stock=[], notif_total_count=0)
+
+        from app.models import Order, ProductVariant
+
+        pending_orders = Order.query.filter_by(status='pending').order_by(Order.date_ordered.desc()).limit(5).all()
+        low_stock_variants = ProductVariant.query.filter(ProductVariant.quantity <= 10).limit(5).all()
+
+        pending_orders_count = Order.query.filter_by(status='pending').count()
+        low_stock_count = ProductVariant.query.filter(ProductVariant.quantity <= 10).count()
+
+        return dict(
+            notif_pending_orders=pending_orders,
+            notif_low_stock=low_stock_variants,
+            notif_total_count=pending_orders_count + low_stock_count
+        )
+
     # إنشاء الجداول
     with app.app_context():
         db.create_all()

@@ -33,7 +33,7 @@ class Category(db.Model):
     description = db.Column(db.Text, nullable=True)
     
     # علاقة وان-تو-ميني مع المنتجات
-    products = db.relationship('Product', backref='category_قثم', lazy=True)
+    products = db.relationship('Product', backref='category', lazy=True)
 
     def __repr__(self):
         return f'<Category {self.name}>'
@@ -57,7 +57,7 @@ class Product(db.Model):
     # ربط المنتج بالصنف الرئيسي
     category_id = db.Column(db.Integer, db.ForeignKey('category.id'), nullable=True)
 
-    # 🤖 حقول التحليل الذكي للأقمشة الـ 13 (AI Fabric Metrics)
+    # 🤖 حقول التحليل الذكي للأقمشة (AI Fabric Metrics)
     ai_fabric_type = db.Column(db.String(100), nullable=True)            # 1. نوع القماش المكتشف
     ai_thickness = db.Column(db.String(50), nullable=True)               # 2. السماكة
     ai_weaving_density = db.Column(db.String(100), nullable=True)         # 3. تحليل الكثافة والنسج
@@ -73,6 +73,7 @@ class Product(db.Model):
     ai_recommended_usage = db.Column(db.String(100), nullable=True)       # 12. الاستخدام المقترح
     ai_suggested_season = db.Column(db.String(50), nullable=True)         # 12. الموسم المقترح
     ai_overall_quality_index = db.Column(db.Integer, nullable=True, default=100) # 13. التقييم الرقمي الشامل للجودة
+    ai_estimated_price_per_meter = db.Column(db.String(100), nullable=True) # 14. السعر التقديري للمتر بالسوق (نص، مثل: "8 - 12 $ تقديري")
     ai_analysis = db.Column(db.JSON, nullable=True)                      # حقل الـ JSON الاحتياطي للبيانات الخام
 
     # العلاقات ومغيرات المنتج (Variants)
@@ -148,4 +149,4 @@ class SupplyLog(db.Model):
     notes = db.Column(db.String(250), nullable=True)  # ملاحظات إضافية
 
     # ربط خلفي مع الموديل الرئيسي
-    product = db.relationship('Product', backref=db.backref('supplies', lazy=True, cascade="all, delete-orphan"))    
+    product = db.relationship('Product', backref=db.backref('supplies', lazy=True, cascade="all, delete-orphan"))

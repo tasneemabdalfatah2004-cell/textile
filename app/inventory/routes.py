@@ -7,6 +7,7 @@ from flask_login import login_required, current_user
 from sqlalchemy import func
 from flask import request 
 from app.ai_service import analyze_fabric_image
+from app.ai_mockup_service import generate_fabric_mockup, slugify_usage
 from sqlalchemy.orm import joinedload 
 from datetime import datetime 
 from app import db
@@ -25,7 +26,7 @@ COLOR_MAP = {
     'أبيض': '#ffffff', 'ابيض': '#ffffff',
     'أصفر': '#ffff00', 'اصفر': '#ffff00',
     'رمادي': '#808080', 'بني': '#8b4513',
-    'كحلي': '#000080', 'زهري': '#ffc0cb'
+    'كحلي': '#000080', 'زهني': '#ffc0cb'
 }
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
@@ -37,14 +38,14 @@ def allowed_file(filename):
 def customer_shop():
     # الفلتر هنا يضمن أن الأقمشة المؤرشفة (is_active=False) لا تظهر للزبون
     products = Product.query.filter_by(is_active=True).all()
+    categories = Category.query.all()
     cart = session.get('cart', {})
-    return render_template('inventory/shop.html', products=products, cart=cart)
+    return render_template('inventory/shop.html', products=products, categories=categories, cart=cart)
 # =========================
 # ADD TO CART
 # =========================
 @inventory_bp.route('/cart/add', methods=['POST'])
 def add_to_cart():
-    # 1. استلام البيانات من الـ JavaScript (AJAX)
     variant_id = request.form.get('variant_id')
     try:
         quantity_ordered = float(request.form.get('quantity', 0.0))
@@ -53,10 +54,8 @@ def add_to_cart():
 
     if not variant_id or quantity_ordered <= 0:
         return jsonify({"status": "error", "message": "Invalid input"}), 400
-    # 2. جلب تفاصيل القماش
     variant = ProductVariant.query.get_or_404(variant_id)
     
-    # 3. إدارة السلة في الـ Session
     if 'cart' not in session:
         session['cart'] = {}
     
@@ -64,17 +63,13 @@ def add_to_cart():
     current_in_cart = cart.get(str(variant_id), 0.0)
     total_requested = current_in_cart + quantity_ordered
 
-    # 4. التحقق من المخزون
     if variant.quantity < total_requested:
         return jsonify({"status": "error", "message": f"Only {variant.quantity}m available"}), 400
 
-    # 5. حفظ البيانات
     session['variant_info_' + str(variant_id)] = f"{variant.product.name} - {variant.color_name}"
     cart[str(variant_id)] = total_requested
     session['cart'] = cart
     session.modified = True
-    print("CART =", session.get('cart'))
-    # 6. الرد بنجاح (بدون Reload)
     return jsonify({
         "status": "success", 
         "new_count": len(cart), 
@@ -85,18 +80,12 @@ def add_to_cart():
 # =========================
 @inventory_bp.route('/cart/remove/<string:variant_id>', methods=['POST'])
 def remove_from_cart(variant_id):
-    # التأكد من وجود السلة في السيشن
     if 'cart' in session:
-        # حذف المنتج من قاموس السلة
         if variant_id in session['cart']:
             session['cart'].pop(variant_id)
-            # حذف معلومات المنتج المرتبطة (الاسم واللون)
             session.pop('variant_info_' + str(variant_id), None)
-            # إعلام Flask بأن السيشن تغيرت
             session.modified = True
     
-    # إرجاع العدد الجديد للسلة بتنسيق JSON
-    # هذا الرقم هو ما تستخدمه دالة JavaScript لتحديث العداد في الـ Navbar
     return jsonify({
         "status": "success", 
         "new_count": len(session.get('cart', {}))
@@ -107,165 +96,71 @@ def remove_from_cart(variant_id):
 @inventory_bp.route('/cart/checkout', methods=['POST'])
 def cart_checkout():
 
-    customer_name = request.form.get(
-        'customer_name'
-    )
-
+    customer_name = request.form.get('customer_name')
     cart = session.get('cart', {})
 
     if not customer_name or not cart:
-
-        flash(
-            'Cart is empty or customer name missing.',
-            'danger'
-        )
-
-        return redirect(
-            url_for('inventory.customer_shop')
-        )
-
-    # =========================
-    # STOCK VALIDATION
-    # =========================
+        flash('Cart is empty or customer name missing.', 'danger')
+        return redirect(url_for('inventory.customer_shop'))
 
     for variant_id_str, qty in cart.items():
-
-        variant = ProductVariant.query.get(
-            int(variant_id_str)
-        )
-
+        variant = ProductVariant.query.get(int(variant_id_str))
         if not variant:
-
-            flash(
-                'Product variant not found.',
-                'danger'
-            )
-
-            return redirect(
-                url_for('inventory.customer_shop')
-            )
-
+            flash('Product variant not found.', 'danger')
+            return redirect(url_for('inventory.customer_shop'))
         if variant.quantity < float(qty):
+            flash(f'Insufficient stock for {variant.product.name} - {variant.color_name}', 'danger')
+            return redirect(url_for('inventory.customer_shop'))
 
-            flash(
-                f'Insufficient stock for '
-                f'{variant.product.name} - '
-                f'{variant.color_name}',
-                'danger'
-            )
-
-            return redirect(
-                url_for('inventory.customer_shop')
-            )
-
-    # =========================
-    # CREATE / GET CUSTOMER
-    # =========================
-
-    customer = Customer.query.filter_by(
-        name=customer_name
-    ).first()
-
+    customer = Customer.query.filter_by(name=customer_name).first()
     if not customer:
-
-        customer = Customer(
-            name=customer_name
-        )
-
+        customer = Customer(name=customer_name)
         db.session.add(customer)
         db.session.flush()
 
-    # =========================
-    # CREATE ORDER
-    # =========================
-
-    new_order = Order(
-        customer_id=customer.id,
-        status='pending'
-    )
-
+    new_order = Order(customer_id=customer.id, status='pending')
     db.session.add(new_order)
     db.session.flush()
 
-    # =========================
-    # CREATE ORDER ITEMS
-    # =========================
-
     for variant_id_str, qty in cart.items():
-
-        variant = ProductVariant.query.get(
-            int(variant_id_str)
-        )
-
+        variant = ProductVariant.query.get(int(variant_id_str))
         order_item = OrderItem(
             order_id=new_order.id,
             variant_id=variant.id,
             quantity_ordered=float(qty),
             price_per_unit=variant.product.selling_price
         )
-
         db.session.add(order_item)
 
     db.session.commit()
 
-    # =========================
-    # CLEAR CART
-    # =========================
-
     for variant_id_str in cart.keys():
-
-        session.pop(
-            'variant_info_' + str(variant_id_str),
-            None
-        )
-
+        session.pop('variant_info_' + str(variant_id_str), None)
     session.pop('cart', None)
 
-    flash(
-        'Order submitted successfully and waiting for factory approval.',
-        'success'
-    )
-
-    return redirect(
-        url_for('inventory.customer_shop')
-    )
+    flash('Order submitted successfully and waiting for factory approval.', 'success')
+    return redirect(url_for('inventory.customer_shop'))
 #==========================================
 # APPROVE ORDER
 # ==========================================
 @inventory_bp.route('/approve_order/<int:order_id>', methods=['POST'])
 @login_required
 def approve_order(order_id):
-
     order = Order.query.get_or_404(order_id)
-
-    # already approved
     if order.status == 'approved':
-
         flash('Order already approved', 'info')
         return redirect(url_for('main.dashboard'))
 
-    # reduce stock now
     for item in order.items:
-
         variant = item.variant
-
         if variant.quantity < item.quantity_ordered:
-
-            flash(
-                f'Not enough stock for {variant.product.name} - {variant.color_name}',
-                'danger'
-            )
-
+            flash(f'Not enough stock for {variant.product.name} - {variant.color_name}', 'danger')
             return redirect(url_for('main.dashboard'))
-
         variant.quantity -= item.quantity_ordered
 
     order.status = 'approved'
-
     db.session.commit()
-
     flash('Order approved and shipped successfully', 'success')
-
     return redirect(url_for('main.dashboard'))
 # =========================
 # PRODUCTS LIST
@@ -276,21 +171,13 @@ def list_products():
     filter_type = request.args.get('filter')
     
     if filter_type == 'low_stock':
-        # تشخيص: هل هناك أي متغيرات كميتها <= 10 فعلاً؟
-        all_variants = ProductVariant.query.all()
-        for v in all_variants:
-            print(f"DEBUG: Variant {v.color_name} has quantity: {v.quantity}")
-        
-        # الاستعلام الفعلي
         products = Product.query.join(Product.variants).filter(ProductVariant.quantity <= 10).distinct().all()
-        print(f"DEBUG: Found {len(products)} products with low stock")
-        
     else:
         products = Product.query.all()
         
     return render_template('inventory/list_products.html', products=products, filter_type=filter_type)
 # =========================
-# ADD PRODUCT (VERSION WITH CATEGORY & 13 AI METRICS)
+# ADD PRODUCT (VERSION WITH CATEGORY & AI METRICS)
 # =========================
 @inventory_bp.route('/product/add', methods=['GET', 'POST'])
 @login_required
@@ -299,7 +186,6 @@ def add_product():
         product_name = request.form.get('name', '').strip()
         product = Product.query.filter(Product.name.ilike(product_name)).first()
 
-        # 1. معالجة بيانات المنتج الأساسية (أضفنا استقبال الصنف المختار)
         category_id = request.form.get('category_id')
         chosen_category_id = int(category_id) if category_id else None
 
@@ -320,7 +206,6 @@ def add_product():
             db.session.add(product)
             db.session.flush() # للحصول على product.id
 
-        # 2. معالجة صورة القماش الرئيسية وتشغيل التحليل الذكي الـ 13 تلقائياً
         if 'image' in request.files:
             image = request.files['image']
             if image and image.filename and allowed_file(image.filename):
@@ -328,13 +213,10 @@ def add_product():
                 full_image_path = os.path.join(UPLOAD_FOLDER, main_filename)
                 image.save(full_image_path)
                 
-                # لا نغير الصورة إلا إذا كانت فارغة أو القماش جديد
                 if not product.image_file or product.image_file == 'default.jpg':
                     product.image_file = main_filename
 
-                # 🤖 استدعاء الذكاء الاصطناعي لتحليل الصورة وتعبئة الـ 13 مؤشر تلقائياً 🤖
                 try:
-                    from app.ai_service import analyze_fabric_image # تأكد من اسم الدالة والملف لديك
                     ai_results = analyze_fabric_image(full_image_path)
                     
                     if ai_results:
@@ -353,11 +235,11 @@ def add_product():
                         product.ai_recommended_usage = ai_results.get('recommended_usage')
                         product.ai_suggested_season = ai_results.get('suggested_season')
                         product.ai_overall_quality_index = ai_results.get('overall_quality_index', 100)
-                        product.ai_analysis = ai_results.get('raw_json_data') # حفظ النسخة الخام الاحتياطية
+                        product.ai_estimated_price_per_meter = ai_results.get('estimated_price_per_meter')
+                        product.ai_analysis = ai_results
                 except Exception as e:
-                    print(f"AI Analysis Error: {str(e)}") # لكي لا يتوقف السيرفر إذا حدثت مشكلة في خوادم جوجل
+                    print(f"AI Analysis Error: {str(e)}")
 
-        # 3. معالجة الرسومات / الألوان (Variants)
         variant_names = request.form.getlist('color_names[]')
         quantities = request.form.getlist('color_quantities[]')
         variant_images = request.files.getlist('variant_images[]')
@@ -391,7 +273,6 @@ def add_product():
                 )
                 db.session.add(new_variant)
 
-        # 4. تسجيل المورد (SupplyLog)
         partner_name = request.form.get('partner_name')
         if partner_name:
             supply = SupplyLog(
@@ -407,7 +288,6 @@ def add_product():
         flash('Fabric batch saved successfully with AI Smart Analysis', 'success')
         return redirect(url_for('inventory.list_products'))
 
-    # جلب الأصناف وتمريرها لصفحة الـ HTML لعرضها في القائمة المنسدلة
     categories = Category.query.all()
     return render_template('inventory/add_product.html', categories=categories)
 # =========================
@@ -421,21 +301,26 @@ def edit_product(id):
     product = Product.query.options(joinedload(Product.variants)).get_or_404(id)
 
     if request.method == 'POST':
-        # 1. تحديث الأسعار والصنف (البيانات الأساسية)
         product.cost_price_per_meter = float(request.form.get('cost_price_per_meter') or 0)
         product.selling_price = float(request.form.get('selling_price') or 0)
         
-        # تحديث صنف القماش إذا تم تعديله من قائمة الخيارات
         category_id = request.form.get('category_id')
         product.category_id = int(category_id) if category_id else None
-        
-        # 2. تحديث كميات الديسانات الموجودة (عبر الصور)
+
+        # 🌟 استبدال الصورة الرئيسية بالمتجر (منفصلة عن صورة التحليل) 🌟
+        if 'main_display_image' in request.files:
+            main_image = request.files['main_display_image']
+            if main_image and main_image.filename and allowed_file(main_image.filename):
+                main_filename = secure_filename(main_image.filename)
+                main_filename = f"main_{product.id}_{main_filename}"
+                main_image.save(os.path.join(UPLOAD_FOLDER, main_filename))
+                product.image_file = main_filename
+
         for variant in product.variants:
             qty_input = request.form.get(f'qty_variant_{variant.id}')
             if qty_input is not None:
                 variant.quantity = float(qty_input)
 
-        # 3. معالجة إضافة ديسان جديد (صورة)
         if 'new_variant_image' in request.files:
             file = request.files['new_variant_image']
             if file and file.filename and allowed_file(file.filename):
@@ -451,13 +336,32 @@ def edit_product(id):
                 )
                 db.session.add(new_variant)
 
+        # 🌟 إضافة سجل مصدر/مورد جديد (اختياري) 🌟
+        partner_name = request.form.get('partner_name')
+        if partner_name:
+            supply = SupplyLog(
+                product_id=product.id,
+                partner_name=partner_name,
+                supplied_quantity=float(request.form.get('source_quantity') or 0),
+                cost_price_at_purchase=float(request.form.get('source_cost_price') or 0),
+                notes=request.form.get('source_notes')
+            )
+            db.session.add(supply)
+
         db.session.commit()
         flash("Product and design specifications updated successfully", "success")
         return redirect(url_for('inventory.list_products'))
 
-    # جلب جميع الأصناف لتظهر في قائمة التعديل المنسدلة
     categories = Category.query.all()
     return render_template('inventory/edit_product.html', product=product, categories=categories)
+# =========================
+# AI REPORT VIEW (SAVED PRODUCT)
+# =========================
+@inventory_bp.route('/product/ai-report/<int:id>')
+@login_required
+def view_ai_report(id):
+    product = Product.query.get_or_404(id)
+    return render_template('inventory/product_ai_report.html', product=product)
 # =========================
 # SALES HISTORY
 # =========================
@@ -465,8 +369,6 @@ def edit_product(id):
 @login_required
 def sales_history():
     from app.models import Order
-    # نستخدم joinedload(Order.customer) لضمان جلب الزبون مع كل طلب
-    # ونضيف joinedload(Order.items) أيضاً لتسريع عرض الأصناف
     orders = Order.query.options(
         joinedload(Order.customer),
         joinedload(Order.items).joinedload(OrderItem.variant)
@@ -483,12 +385,11 @@ def customer_details(customer_id):
     orders = customer.orders 
     total_spent = sum(order.total_price for order in orders)
     
-    # يجب إرسال المتغير now لصفحة الـ HTML
     return render_template('inventory/customer_report.html', 
                            customer=customer, 
                            orders=orders, 
                            total_spent=total_spent,
-                           now=datetime.now()) # هذا السطر هو الحل لخطأ 'now' في التقرير
+                           now=datetime.now())
 # =========================
 # ARCHIVE/UNARCHIVE PRODUCT
 # =========================
@@ -496,7 +397,6 @@ def customer_details(customer_id):
 @login_required
 def toggle_archive(id):
     product = Product.query.get_or_404(id)
-    # تغيير الحالة: إذا كان True يصبح False (مؤرشف)، والعكس صحيح
     product.is_active = not product.is_active
     db.session.commit()
     
@@ -509,7 +409,6 @@ def toggle_archive(id):
 @inventory_bp.route('/sources')
 @login_required
 def list_sources():
-    # جلب كل سجلات الشراء والمصادر مرتبة من الأحدث للأقدم
     all_supplies = SupplyLog.query.order_by(SupplyLog.purchase_date.desc()).all()
     return render_template('inventory/list_sources.html', supplies=all_supplies)
 #================    
@@ -517,38 +416,23 @@ def list_sources():
 @login_required
 def view_customs(filename):
     try:
-        # تأكد أن UPLOAD_FOLDER معرف عندك بالملف ويشير لمجلد حفظ الملفات
         return send_from_directory(uploads, filename)
     except FileNotFoundError:
         abort(404, description="Customs document file not found on core storage.")    
 @inventory_bp.route('/product/search')
 @login_required
 def search_products():
-
     term = request.args.get('q', '').strip()
-
     if not term:
         return jsonify([])
-
-    products = Product.query.filter(
-        Product.name.ilike(f"%{term}%")
-    ).limit(10).all()
-
-    return jsonify([
-        product.name
-        for product in products
-    ])        
+    products = Product.query.filter(Product.name.ilike(f"%{term}%")).limit(10).all()
+    return jsonify([product.name for product in products])        
 @inventory_bp.route('/product/details/<string:name>')
 @login_required
 def product_details(name):
-
-    product = Product.query.filter(
-        Product.name.ilike(name)
-    ).first()
-
+    product = Product.query.filter(Product.name.ilike(name)).first()
     if not product:
         return jsonify({})
-
     return jsonify({
         "id": product.id,
         "name": product.name,
@@ -558,25 +442,17 @@ def product_details(name):
     })    
 @inventory_bp.route('/cart')
 def view_cart():
-    # هذا السطر سيطبع محتوى السلة في الـ Terminal عند دخول صفحة السلة
-    print("DEBUG: View Cart - Session Data:", session.get('cart'))
-    
-    # تأكد أنك لا تعيد تعريف السلة هنا
     cart = session.get('cart', {})
-    
     return render_template('cart.html', cart=cart)    
 @inventory_bp.route('/financial-report')
 @login_required
 def financial_report():
-    # استعلام الأرباح
     total_revenue = db.session.query(
         func.sum(OrderItem.price_per_unit * OrderItem.quantity_ordered)
     ).join(Order).filter(Order.status == 'approved').scalar() or 0
     
-    # استعلام الطلبات المعتمدة
     approved_orders = Order.query.filter_by(status='approved').all()
     
-    # تأكد من المسار الصحيح للملف
     return render_template('inventory/financial_report.html', 
                            orders=approved_orders, 
                            total_revenue=total_revenue)
@@ -584,7 +460,6 @@ def financial_report():
 @inventory_bp.route('/fix-database')
 def fix_database():
     from app.models import Order
-    # جلب جميع الطلبات التي ليس لها زبون
     orphaned_orders = Order.query.filter(Order.customer_id == None).all()
     count = len(orphaned_orders)
     
@@ -596,11 +471,7 @@ def fix_database():
 @inventory_bp.route('/orders/pending')
 @login_required
 def pending_orders():
-    # جلب الطلبات المعلقة فقط من قاعدة البيانات
-    # افترضنا أن لديك علاقة تربط Order بـ OrderItem
     pending_items = OrderItem.query.join(Order).filter(Order.status == 'pending').all()
-    print(f"DEBUG: Found {len(pending_items)} pending orders")
-    
     return render_template('inventory/pending_orders.html', pending_items=pending_items)    
 #-------------------------------------------------------------------------------------------------------------------
 #AI    
@@ -627,10 +498,8 @@ def analyze():
             file.save(file_path)
             
             try:
-                # هنا سيأتي إما قاموس مليء بالبيانات أو {}
                 ai_result = analyze_fabric_image(file_path)
                 
-                # التحقق الذكي: إذا كان ai_result فارغاً، فهذا يعني فشل التحليل
                 if not ai_result:
                     flash("عذراً، لم يتمكن الذكاء الاصطناعي من تحليل هذه الصورة. يرجى تجربة صورة أوضح.", "warning")
                     return redirect(url_for('inventory.analyze'))
@@ -644,25 +513,23 @@ def analyze():
             
     return render_template('inventory/upload.html')
 #---------------------------------------------
-# SAVE PRODUCT (MODIFIED FOR 13 AI METRICS)
+# SAVE PRODUCT (MODIFIED FOR AI METRICS)
 #-------------------------------------------
 @inventory_bp.route('/save-product', methods=['POST'])
-@login_required # تأكد من إضافتها للحماية
+@login_required
 def save_product():
     try:
         name = request.form.get('name')
         image_name = request.form.get('image_name') or 'default.jpg'
         ai_analysis_json = request.form.get('ai_analysis_json')
         
-        # تصحيح جذري: التأكد أننا نتعامل مع قاموس (Dictionary) دائماً
         analysis_data = {}
         if ai_analysis_json:
             try:
                 analysis_data = json.loads(ai_analysis_json)
             except:
-                analysis_data = {} # في حال كان الـ JSON معطوباً، نستخدم قاموساً فارغاً
+                analysis_data = {}
         
-        # التأكد أن analysis_data ليست None
         if analysis_data is None:
             analysis_data = {}
 
@@ -670,7 +537,7 @@ def save_product():
             name=name,
             image_file=image_name,
             ai_analysis=analysis_data,
-            # الآن نستخدم .get بأمان لأننا ضمنا أن analysis_data قاموس صالح
+            is_active=False,  # 🔒 مسودة: ما بيطلع عند الزبون حتى تنشريه يدوياً
             ai_fabric_type=analysis_data.get('fabric_type'),
             ai_thickness=analysis_data.get('thickness'),
             ai_weaving_density=analysis_data.get('weaving_density'),
@@ -685,34 +552,32 @@ def save_product():
             ai_defects_details=analysis_data.get('defects_details'),
             ai_recommended_usage=analysis_data.get('recommended_usage'),
             ai_suggested_season=analysis_data.get('suggested_season'),
-            ai_overall_quality_index=analysis_data.get('overall_quality_index', 100)
+            ai_overall_quality_index=analysis_data.get('overall_quality_index', 100),
+            ai_estimated_price_per_meter=analysis_data.get('estimated_price_per_meter')
         )
         
         db.session.add(new_product)
         db.session.commit()
         
-        flash('تم حفظ المنتج وتوزيع نتائج التحليل بنجاح! 🎉', 'success')
-        return redirect(url_for('inventory.list_products'))
+        flash('تم حفظ القماش كمسودة 📋 — أكملي السعر والكمية والصنف، ثم فعّليه ليظهر عند الزبون.', 'success')
+        return redirect(url_for('inventory.edit_product', id=new_product.id))
         
     except Exception as e:
         db.session.rollback()
-        # طباعة الخطأ في الكونسول لمعرفة السبب الحقيقي
         print(f"Error detail: {e}") 
         flash(f'حدث خطأ أثناء حفظ المنتج: {str(e)}', 'danger')
         return redirect(url_for('inventory.analyze'))
 #-----------------------
 @inventory_bp.route('/products')
 def list_product():
-    # جلب جميع المنتجات من قاعدة البيانات لعرضها للمدير
     products = Product.query.all()
     return render_template('inventory/products_list.html', products=products)        
 # ==========================================
-# MANAGEMENT OF CATEGORIES (مسار إدارة الأصناف)
+# MANAGEMENT OF CATEGORIES
 # ==========================================
 @inventory_bp.route('/categories', methods=['GET', 'POST'])
 @login_required
 def manage_categories():
-    # التحقق من أن المستخدم لديه صلاحية أدمن
     if current_user.role != 'admin':
         flash('عذراً، لا تمتلك صلاحية للوصول إلى هذه الصفحة.', 'danger')
         return redirect(url_for('inventory.list_products'))
@@ -721,7 +586,6 @@ def manage_categories():
         category_name = request.form.get('name', '').strip()
         category_desc = request.form.get('description', '').strip()
         
-        # التأكد من عدم تكرار اسم الصنف (مثل عدم تكرار جاكار أو مخمل)
         existing_category = Category.query.filter_by(name=category_name).first()
         if existing_category:
             flash('هذا الصنف موجود بالفعل!', 'warning')
@@ -732,15 +596,60 @@ def manage_categories():
             flash(f'تم إضافة صنف "{category_name}" بنجاح! 🎉', 'success')
             return redirect(url_for('inventory.manage_categories'))
 
-    # جلب جميع الأصناف لعرضها في جدول بالصفحة
     categories = Category.query.all()
     return render_template('inventory/manage_categories.html', categories=categories)    
 @inventory_bp.route('/delete-category/<int:id>', methods=['POST'])
 @login_required
 def delete_category(id):
-    # كود الحذف
     category = Category.query.get_or_404(id)
     db.session.delete(category)
     db.session.commit()
     flash('Category deleted successfully!', 'success')
-    return redirect(url_for('inventory.manage_categories'))    
+    return redirect(url_for('inventory.manage_categories'))
+# =========================
+# AI FABRIC MOCKUP PREVIEW (SHOP)
+# =========================
+@inventory_bp.route('/product/preview-mockup', methods=['POST'])
+def preview_mockup():
+    product_id = request.form.get('product_id')
+    usage_type = (request.form.get('usage_type') or '').strip()
+
+    if not product_id or not usage_type:
+        return jsonify({"status": "error", "message": "بيانات ناقصة، اختاري نوع الاستخدام أولاً"}), 400
+
+    product = Product.query.get(product_id)
+    if not product:
+        return jsonify({"status": "error", "message": "المنتج غير موجود"}), 404
+
+    image_path = os.path.join(UPLOAD_FOLDER, product.image_file)
+
+    # 🗂️ Cache: اسم ملف ثابت لكل توليفة (منتج + نوع استخدام) لتفادي توليد نفس الصورة أكتر من مرة
+    slug = slugify_usage(usage_type)
+    cache_filename = f"mockup_{product_id}_{slug}.png"
+    cache_full_path = os.path.join(UPLOAD_FOLDER, 'mockups', cache_filename)
+
+    if os.path.exists(cache_full_path):
+        return jsonify({
+            "status": "success",
+            "image_url": url_for('static', filename='uploads/mockups/' + cache_filename),
+            "cached": True
+        })
+
+    mockup_relative_path = generate_fabric_mockup(
+        image_path=image_path,
+        usage_type=usage_type,
+        fabric_type=product.ai_fabric_type,
+        save_filename=cache_filename
+    )
+
+    if not mockup_relative_path:
+        return jsonify({
+            "status": "error",
+            "message": "تعذر توليد المعاينة حالياً، حاولي مرة تانية بعد شوي"
+        }), 500
+
+    return jsonify({
+        "status": "success",
+        "image_url": url_for('static', filename='uploads/' + mockup_relative_path),
+        "cached": False
+    })

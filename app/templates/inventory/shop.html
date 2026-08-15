@@ -15,7 +15,7 @@
         </div>
     </div>
 
-    <!-- 🌟 New Dynamic Category Filter Buttons 🌟 -->
+    <!-- Category Filter Buttons -->
     <div class="row justify-content-center mb-5">
         <div class="col-md-10 text-center">
             <div class="btn-group flex-wrap gap-2 justify-content-center" role="group">
@@ -30,17 +30,20 @@
     <!-- Fabrics Grid -->
     <div class="row" id="fabric-grid">
         {% for product in products %}
-        <!-- Added data-category and data-name attributes for quick dynamic filtering -->
         <div class="col-md-4 mb-4 fabric-item" data-category="{{ product.category_id or 'none' }}" data-name="{{ product.name|lower }}">
             <div class="card h-100 shadow-sm border-0" style="border-radius: 12px; overflow: hidden;">
                 <img src="{{ url_for('static', filename='uploads/' + product.image_file) }}" class="card-img-top" style="height: 240px; object-fit: cover; margin:4px;" alt="{{ product.name }}">
                 <div class="card-body text-center">
                     <h4 class="font-weight-bold mb-1">{{ product.name }}</h4>
-                    
-                    <!-- Display Category Name if exists -->
-                    {% if product.category %}
-                        <div class="mb-2"><span class="badge bg-light text-secondary border">{{ product.category.name }}</span></div>
-                    {% endif %}
+
+                    <div class="mb-2">
+                        <span class="badge bg-success text-white px-3 py-2" style="font-size: 0.95rem;">
+                            <i class="fas fa-tag mr-1"></i> ${{ "%.2f"|format(product.selling_price) }} / متر
+                        </span>
+                        {% if product.category %}
+                            <span class="badge bg-light text-secondary border">{{ product.category.name }}</span>
+                        {% endif %}
+                    </div>
 
                     {% if product.description %}
                         <p class="text-muted small mb-2">{{ product.description }}</p>
@@ -69,11 +72,52 @@
                                 </div>
                                 {% endif %}
                             {% endfor %}
-                            </div>
+                        </div>
+                    </div>
+
+                    <div class="d-flex gap-2">
+                        {% set usage_options = (product.ai_recommended_usage or '').replace('،', ',').split(',') %}
+                        {% set has_usage = usage_options|map('trim')|select|list|length > 0 %}
+                        {% if has_usage %}
+                        <button class="btn btn-outline-primary rounded-pill flex-fill mb-2" data-toggle="modal" data-target="#mockupModal{{ product.id }}">
+                            <i class="fas fa-magic"></i> Preview Look
+                        </button>
+                        {% endif %}
                     </div>
                     <button class="btn btn-outline-success w-100 rounded-pill" onclick="openOrderModal('{{ product.id }}', '{{ product.name }}')">
                         <i class="fas fa-cart-plus"></i> Add To Cart
                     </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Mockup Preview Modal (per product) -->
+        {% set usage_options = (product.ai_recommended_usage or '').replace('،', ',').split(',') %}
+        <div class="modal fade" id="mockupModal{{ product.id }}" tabindex="-1" role="dialog" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered" role="document">
+                <div class="modal-content" style="border-radius: 15px;">
+                    <div class="modal-header bg-primary text-white">
+                        <h5 class="modal-title"><i class="fas fa-magic"></i> Preview: {{ product.name }}</h5>
+                        <button type="button" class="close text-white" data-dismiss="modal">&times;</button>
+                    </div>
+                    <div class="modal-body text-center p-4">
+                        <div class="form-group text-left">
+                            <label class="font-weight-bold">شو حابة تشوفي القماش كأنه:</label>
+                            <select class="form-control mockup-usage-select" id="mockup-usage-{{ product.id }}">
+                                {% for usage in usage_options %}
+                                    {% if usage.strip() %}
+                                    <option value="{{ usage.strip() }}">{{ usage.strip() }}</option>
+                                    {% endif %}
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <button class="btn btn-primary w-100 mb-3" onclick="requestMockup('{{ product.id }}')">
+                            <i class="fas fa-magic"></i> Generate Preview
+                        </button>
+
+                        <div id="mockup-result-{{ product.id }}" class="mt-2"></div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -166,7 +210,6 @@ function addToCartAjax(){
     const vId = $('#hidden-variant-id').val();
     const qty = $('#v-qty').val();
 
-    // 🛠️ تم تصحيح منطق الفحص البرمجي هنا باستخدام || 🛠️
     if(!vId || !qty){
         Swal.fire('Error', 'Select pattern and quantity', 'error');
         return;
@@ -208,48 +251,93 @@ function removeItem(variantId) {
     });
 }
 
-// 🌟 تعديل منطق أزرار فلترة الأصناف البرمجي التفاعلي 🌟
-$('.filter-btn').click(function(){
-    const targetFilter = $(this).data('filter').toString();
+// 🌟 معاينة شكل القماش (AI Mockup) 🌟
+function requestMockup(productId) {
+    const usageSelect = document.getElementById('mockup-usage-' + productId);
+    const usageType = usageSelect ? usageSelect.value : '';
+    const resultBox = document.getElementById('mockup-result-' + productId);
 
-    $('.filter-btn').removeClass('active');
-    $(this).addClass('active');
+    if (!usageType) {
+        Swal.fire('Warning', 'اختاري نوع الاستخدام أولاً', 'warning');
+        return;
+    }
 
-    // تصفير شريط البحث النصي عند تصفح الأقسام لتفادي التداخل
-    $('#fabricSearch').val('');
+    resultBox.innerHTML = `
+        <div class="text-muted py-3">
+            <div class="spinner-border text-primary mb-2" role="status"></div>
+            <p class="mb-0">عم يتولّد الشكل... ممكن ياخد كم ثانية ⏳</p>
+        </div>
+    `;
 
-    $('.fabric-item').each(function() {
-        const itemCategory = $(this).data('category').toString();
-        if (targetFilter === 'all' || itemCategory === targetFilter) {
-            $(this).fadeIn(300);
-        } else {
-            $(this).fadeOut(300);
+    $.ajax({
+        url: '/product/preview-mockup',
+        method: 'POST',
+        data: {
+            product_id: productId,
+            usage_type: usageType
+        },
+        success: function(response) {
+            if (response.status === 'success') {
+                resultBox.innerHTML = `<img src="${response.image_url}" class="img-fluid rounded shadow-sm" style="max-height: 350px; object-fit: cover;">`;
+            } else {
+                resultBox.innerHTML = `<p class="text-danger mb-0">${response.message || 'صار خطأ، حاولي مرة تانية'}</p>`;
+            }
+        },
+        error: function(xhr) {
+            let msg = 'تعذر توليد المعاينة، حاولي مرة تانية بعد شوي';
+            if (xhr.responseJSON && xhr.responseJSON.message) {
+                msg = xhr.responseJSON.message;
+            }
+            resultBox.innerHTML = `<p class="text-danger mb-0">${msg}</p>`;
         }
     });
-});
+}
 
-$(document).ready(function(){
+// 🌟 تم لف كل أكواد jQuery بـ DOMContentLoaded عشان تنتظر تحميل jQuery فعلياً
+// (سكريبت jQuery بآخر base.html، بعد هاد المحتوى بالترتيب، فالكود القديم كان
+// بيحاول يستخدم $ قبل ما تكون محمّلة أصلاً وبيوقف صامت بدون أي رسالة بالكونسول) 🌟
+document.addEventListener('DOMContentLoaded', function() {
+
+    $('.filter-btn').click(function(){
+        const targetFilter = $(this).data('filter').toString();
+
+        $('.filter-btn').removeClass('active');
+        $(this).addClass('active');
+
+        $('#fabricSearch').val('');
+
+        $('.fabric-item').each(function() {
+            const itemCategory = $(this).data('category').toString();
+            if (targetFilter === 'all' || itemCategory === targetFilter) {
+                $(this).fadeIn(300);
+            } else {
+                $(this).fadeOut(300);
+            }
+        });
+    });
+
     const urlParams = new URLSearchParams(window.location.search);
     if (urlParams.has('cart_open')) {
         $('#cartModal').modal('show');
     }
+
+    $('#fabricSearch').on('keyup', function() {
+        var value = $(this).val().toLowerCase().trim();
+        $('.filter-btn').removeClass('active');
+        $('.filter-btn[data-filter="all"]').addClass('active');
+
+        $('.fabric-item').each(function() {
+            var productName = $(this).data('name');
+            if (value === "" || productName.includes(value)) {
+                $(this).show();
+            } else {
+                $(this).hide();
+            }
+        });
+    });
+
 });
 
-// فلترة البحث النصي
-$('#fabricSearch').on('keyup', function() {
-    var value = $(this).val().toLowerCase().trim();
-    $('.filter-btn').removeClass('active');
-    $('.filter-btn[data-filter="all"]').addClass('active'); // إعادة تفعيل زر الكل عند استخدام البحث
-    
-    $('.fabric-item').each(function() {
-        var productName = $(this).data('name');
-        if (value === "" || productName.includes(value)) {
-            $(this).show();
-        } else {
-            $(this).hide();
-        }
-    });
-});
 </script>
 
 <style>
@@ -265,7 +353,7 @@ $('#fabricSearch').on('keyup', function() {
     .fabric-item .card-body p {
         flex-grow: 1;
     }
-    .fabric-item .card-body button {
+    .fabric-item .card-body > button:last-child {
         margin-top: auto;
     }
     #fabricSearch:focus {
@@ -278,3 +366,4 @@ $('#fabricSearch').on('keyup', function() {
     }
 </style>
 {% endblock %}
+
