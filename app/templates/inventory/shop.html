@@ -2,20 +2,17 @@
 {% block content %}
 
 <div class="container mt-5" dir="ltr">
-    <!-- Header -->
     <div class="text-center my-5">
         <h1 class="display-4 font-weight-bold"><i class="fas fa-store text-success"></i> Smart Fabric Store</h1>
         <p class="text-muted">Browse our premium textile collection and order directly from the factory</p>
     </div>
 
-    <!-- Search Bar -->
     <div class="row justify-content-center mb-4">
         <div class="col-md-6">
             <input type="text" id="fabricSearch" class="form-control rounded-pill shadow-sm" placeholder="🔍 Search for a fabric name...">
         </div>
     </div>
 
-    <!-- Category Filter Buttons -->
     <div class="row justify-content-center mb-5">
         <div class="col-md-10 text-center">
             <div class="btn-group flex-wrap gap-2 justify-content-center" role="group">
@@ -27,11 +24,12 @@
         </div>
     </div>
 
-    <!-- Fabrics Grid -->
     <div class="row" id="fabric-grid">
         {% for product in products %}
         <div class="col-md-4 mb-4 fabric-item" data-category="{{ product.category_id or 'none' }}" data-name="{{ product.name|lower }}">
             <div class="card h-100 shadow-sm border-0" style="border-radius: 12px; overflow: hidden;">
+                <input type="hidden" id="selected-variant-{{ product.id }}" value="">
+
                 <img src="{{ url_for('static', filename='uploads/' + product.image_file) }}" class="card-img-top" style="height: 240px; object-fit: cover; margin:4px;" alt="{{ product.name }}">
                 <div class="card-body text-center">
                     <h4 class="font-weight-bold mb-1">{{ product.name }}</h4>
@@ -57,12 +55,12 @@
                                 {% if variant.image_filename %}
                                 <img
                                     src="{{ url_for('static', filename='uploads/' + variant.image_filename) }}"
-                                    class="pattern-circle"
+                                    class="pattern-circle pattern-circle-{{ product.id }}"
                                     width="50"
                                     height="50"
                                     title="{{ variant.color_name }}"
                                     style="border-radius:50%; object-fit:cover; border:3px solid #dee2e6; cursor:pointer; transition:0.2s;"
-                                    onclick="handleColorSelection(this)"
+                                    onclick="handleColorSelection(this, '{{ product.id }}')"
                                     data-variant-id="{{ variant.id }}"
                                     data-variant-name="{{ variant.color_name }}"
                                 >
@@ -76,13 +74,9 @@
                     </div>
 
                     <div class="d-flex gap-2">
-                        {% set usage_options = (product.ai_recommended_usage or '').replace('،', ',').split(',') %}
-                        {% set has_usage = usage_options|map('trim')|select|list|length > 0 %}
-                        {% if has_usage %}
                         <button class="btn btn-outline-primary rounded-pill flex-fill mb-2" data-toggle="modal" data-target="#mockupModal{{ product.id }}">
                             <i class="fas fa-magic"></i> Preview Look
                         </button>
-                        {% endif %}
                     </div>
                     <button class="btn btn-outline-success w-100 rounded-pill" onclick="openOrderModal('{{ product.id }}', '{{ product.name }}')">
                         <i class="fas fa-cart-plus"></i> Add To Cart
@@ -91,7 +85,6 @@
             </div>
         </div>
 
-        <!-- Mockup Preview Modal (per product) -->
         {% set usage_options = (product.ai_recommended_usage or '').replace('،', ',').split(',') %}
         <div class="modal fade" id="mockupModal{{ product.id }}" tabindex="-1" role="dialog" aria-hidden="true">
             <div class="modal-dialog modal-dialog-centered" role="document">
@@ -101,15 +94,21 @@
                         <button type="button" class="close text-white" data-dismiss="modal">&times;</button>
                     </div>
                     <div class="modal-body text-center p-4">
-                        <div class="form-group text-left">
-                            <label class="font-weight-bold">شو حابة تشوفي القماش كأنه:</label>
-                            <select class="form-control mockup-usage-select" id="mockup-usage-{{ product.id }}">
+                        <div class="form-group text-left mb-3">
+                            <label class="font-weight-bold">اختر نوع الاستخدام:</label>
+                            <select class="form-control mockup-usage-select" id="mockup-usage-{{ product.id }}" onchange="toggleCustomUsage('{{ product.id }}')">
                                 {% for usage in usage_options %}
                                     {% if usage.strip() %}
                                     <option value="{{ usage.strip() }}">{{ usage.strip() }}</option>
                                     {% endif %}
                                 {% endfor %}
+                                <option value="custom">✨ خيار آخر (أدخل نص مخصص)...</option>
                             </select>
+                        </div>
+
+                        <div class="form-group text-left mb-3" id="custom-usage-group-{{ product.id }}" style="display: none;">
+                            <label class="font-weight-bold text-primary">شو حابة تشوفي النقشة كأنه؟ (مثال: حقيبة، فستان، ستائر...):</label>
+                            <input type="text" class="form-control" id="mockup-custom-input-{{ product.id }}" placeholder="أدخلي نوع منتج مخصص...">
                         </div>
 
                         <button class="btn btn-primary w-100 mb-3" onclick="requestMockup('{{ product.id }}')">
@@ -122,10 +121,9 @@
             </div>
         </div>
         {% endfor %}
-     </div>
+    </div>
 </div>
 
-<!-- Active Cart Modal -->
 <div class="modal fade" id="cartModal" tabindex="-1" role="dialog" aria-hidden="true">
     <div class="modal-dialog modal-lg" role="document">
         <div class="modal-content" style="border-radius: 15px;">
@@ -163,7 +161,6 @@
     </div>
 </div>
 
-<!-- Order Detail Selection Modal -->
 <div class="modal fade" id="orderModal" tabindex="-1" role="dialog">
     <div class="modal-dialog modal-dialog-centered" role="document">
         <div class="modal-content">
@@ -190,39 +187,49 @@
 </div>
 
 <script>
-function handleColorSelection(el){
-    $('.pattern-circle').css('border-color', '#dee2e6');
+function handleColorSelection(el, productId) {
+    // Reset border for all variant circles of this specific product card
+    $(`.pattern-circle-${productId}`).css('border-color', '#dee2e6');
     $(el).css('border-color', '#28a745');
-    $('#hidden-variant-id').val($(el).data('variant-id'));
-    $('#display-color-name').val($(el).data('variant-name'));
+
+    const variantId = $(el).data('variant-id');
+    const variantName = $(el).data('variant-name');
+
+    // Store selected variant ID in product card hidden input
+    $(`#selected-variant-${productId}`).val(variantId);
+
+    // Update cart modal inputs
+    $('#hidden-variant-id').val(variantId);
+    $('#display-color-name').val(variantName);
 }
 
-function openOrderModal(productId, productName){const variantId = $('#hidden-variant-id').val();
-    if(!variantId){
-        Swal.fire('Warning', 'Please select a pattern first', 'warning');
+function openOrderModal(productId, productName) {
+    const variantId = $(`#selected-variant-${productId}`).val();
+    if (!variantId) {
+        Swal.fire('Warning', 'Please select a pattern/color first', 'warning');
         return;
     }
     $('#modal-product-name').text('Adding: ' + productName);
     $('#orderModal').modal('show');
 }
 
-function addToCartAjax(){
+function addToCartAjax() {
     const vId = $('#hidden-variant-id').val();
     const qty = $('#v-qty').val();
 
-    if(!vId || !qty){
+    if (!vId || !qty) {
         Swal.fire('Error', 'Select pattern and quantity', 'error');
         return;
     }
 
     $.ajax({
-        url:'/cart/add',
-        method:'POST',
-        data:{
+        url: '/cart/add',
+        method: 'POST',
+        data: {
             variant_id: vId,
             quantity: qty
         },
-        success:function(response){
+        success: function(response) {
             $('#orderModal').modal('hide');
             $('#v-qty').val('');
             Swal.fire({
@@ -235,7 +242,7 @@ function addToCartAjax(){
                 location.reload(); 
             });
         },
-        error:function(xhr){
+        error: function(xhr) {
             let errorMessage = "Something went wrong";
             if (xhr.responseJSON && xhr.responseJSON.message) {
                 errorMessage = xhr.responseJSON.message;
@@ -251,21 +258,44 @@ function removeItem(variantId) {
     });
 }
 
-// 🌟 معاينة شكل القماش (AI Mockup) 🌟
-function requestMockup(productId) {
+function toggleCustomUsage(productId) {
     const usageSelect = document.getElementById('mockup-usage-' + productId);
-    const usageType = usageSelect ? usageSelect.value : '';
-    const resultBox = document.getElementById('mockup-result-' + productId);
+    const customGroup = document.getElementById('custom-usage-group-' + productId);
 
-    if (!usageType) {
-        Swal.fire('Warning', 'اختاري نوع الاستخدام أولاً', 'warning');
+    if (usageSelect && usageSelect.value === 'custom') {
+        customGroup.style.display = 'block';
+    } else {
+        customGroup.style.display = 'none';
+    }
+}
+
+// 🌟 AI Mockup Generation per Selected Variant 🌟
+function requestMockup(productId) {
+    const variantId = $(`#selected-variant-${productId}`).val();
+
+    if (!variantId) {
+        Swal.fire('تنبيه', 'يرجى اختيار النقشة/اللون بالضغط على إحدى الدوائر قبل المعاينة', 'warning');
         return;
     }
 
+    const usageSelect = document.getElementById('mockup-usage-' + productId);
+    let selectedUsage = usageSelect ? usageSelect.value : '';
+
+    if (selectedUsage === 'custom') {
+        const customInput = document.getElementById('mockup-custom-input-' + productId);
+        selectedUsage = customInput ? customInput.value.trim() : '';
+    }
+
+    if (!selectedUsage) {
+        Swal.fire('تنبيه', 'يرجى تحديد أو كتابة نوع الاستخدام', 'warning');
+        return;
+    }
+
+    const resultBox = document.getElementById('mockup-result-' + productId);
     resultBox.innerHTML = `
-        <div class="text-muted py-3">
+        <div class="text-muted py-3 text-center">
             <div class="spinner-border text-primary mb-2" role="status"></div>
-            <p class="mb-0">عم يتولّد الشكل... ممكن ياخد كم ثانية ⏳</p>
+            <p class="mb-0">عم يتولّد الشكل بناءً على النقشة المختارة... ⏳</p>
         </div>
     `;
 
@@ -274,11 +304,14 @@ function requestMockup(productId) {
         method: 'POST',
         data: {
             product_id: productId,
-            usage_type: usageType
+            variant_id: variantId,
+            usage_type: selectedUsage
         },
         success: function(response) {
             if (response.status === 'success') {
-                resultBox.innerHTML = `<img src="${response.image_url}" class="img-fluid rounded shadow-sm" style="max-height: 350px; object-fit: cover;">`;
+                renderMockupImage(resultBox, response.image_url);
+            } else if (response.status === 'pending' && response.task_id) {
+                pollMockupStatus(response.task_id, productId, variantId, selectedUsage, resultBox);
             } else {
                 resultBox.innerHTML = `<p class="text-danger mb-0">${response.message || 'صار خطأ، حاولي مرة تانية'}</p>`;
             }
@@ -293,9 +326,32 @@ function requestMockup(productId) {
     });
 }
 
-// 🌟 تم لف كل أكواد jQuery بـ DOMContentLoaded عشان تنتظر تحميل jQuery فعلياً
-// (سكريبت jQuery بآخر base.html، بعد هاد المحتوى بالترتيب، فالكود القديم كان
-// بيحاول يستخدم $ قبل ما تكون محمّلة أصلاً وبيوقف صامت بدون أي رسالة بالكونسول) 🌟
+function pollMockupStatus(taskId, productId, variantId, usageType, resultBox) {
+    const pollInterval = setInterval(function() {
+        $.ajax({
+            url: `/product/mockup-status/${taskId}?product_id=${productId}&variant_id=${variantId}&usage_type=${encodeURIComponent(usageType)}`,
+            method: 'GET',
+            success: function(res) {
+                if (res.status === 'completed' && res.image_url) {
+                    clearInterval(pollInterval);
+                    renderMockupImage(resultBox, res.image_url);
+                } else if (res.status === 'failed') {
+                    clearInterval(pollInterval);
+                    resultBox.innerHTML = `<p class="text-danger mb-0">${res.message || 'فشل توليد المعاينة'}</p>`;
+                }
+            },
+            error: function() {
+                clearInterval(pollInterval);
+                resultBox.innerHTML = `<p class="text-danger mb-0">حدث خطأ أثناء متابعة التوليد</p>`;
+            }
+        });
+    }, 3000);
+}
+
+function renderMockupImage(container, imageUrl) {
+    container.innerHTML = `<img src="${imageUrl}" class="img-fluid rounded shadow-sm" style="max-height: 350px; object-fit: cover;">`;
+}
+
 document.addEventListener('DOMContentLoaded', function() {
 
     $('.filter-btn').click(function(){
@@ -337,7 +393,6 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
 });
-
 </script>
 
 <style>
@@ -366,4 +421,3 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 </style>
 {% endblock %}
-

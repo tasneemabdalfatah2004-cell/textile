@@ -1,4 +1,5 @@
 import os
+import requests
 import uuid
 import json
 from app.models import Product, db 
@@ -15,6 +16,9 @@ from app.models import User, Product, ProductVariant, Order, OrderItem, Customer
 from werkzeug.utils import secure_filename
 # تم تصحيح البلوبرينت ليعمل بسلاسة
 inventory_bp = Blueprint('inventory', __name__)
+
+NANOBANANA_API_KEY = os.getenv("NANOBANANA_API_KEY", "YOUR_NANOBANANA_API_TOKEN")
+IMGBB_API_KEY = os.getenv("IMGBB_API_KEY", "YOUR_FREE_IMGBB_API_KEY") # Free key for uploading local images
 
 UPLOAD_FOLDER = os.path.join('app', 'static', 'uploads')
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'pdf'}
@@ -609,24 +613,60 @@ def delete_category(id):
 # =========================
 # AI FABRIC MOCKUP PREVIEW (SHOP)
 # =========================
+def upload_local_image_to_public_url(local_path):
+    """
+    Uploads local fabric/variant image to ImgBB so NanoBanana servers can access it.
+    """
+    try:
+        if not os.path.exists(local_path):
+            return None
+            
+        with open(local_path, "rb") as file:
+            response = requests.post(
+                "https://api.imgbb.com/1/upload",
+                data={"key": IMGBB_API_KEY},
+                files={"image": file},
+                timeout=15
+            )
+            res_data = response.json()
+            if response.status_code == 200 and res_data.get("success"):
+                return res_data["data"]["url"]
+    except Exception as e:
+        print(f"ImgBB upload error: {e}")
+    return None
+
+
 @inventory_bp.route('/product/preview-mockup', methods=['POST'])
 def preview_mockup():
     product_id = request.form.get('product_id')
+    variant_id = request.form.get('variant_id')
     usage_type = (request.form.get('usage_type') or '').strip()
 
     if not product_id or not usage_type:
-        return jsonify({"status": "error", "message": "بيانات ناقصة، اختاري نوع الاستخدام أولاً"}), 400
+        return jsonify({"status": "error", "message": "بيانات ناقصة، يرجى تحديد الاستخدام أولاً"}), 400
 
     product = Product.query.get(product_id)
     if not product:
         return jsonify({"status": "error", "message": "المنتج غير موجود"}), 404
 
-    image_path = os.path.join(UPLOAD_FOLDER, product.image_file)
+    # 1. Target the selected variant image instead of default product image
+    variant = ProductVariant.query.get(variant_id) if variant_id else None
+    
+    if variant and variant.image_filename:
+        image_filename = variant.image_filename
+        variant_key = f"v{variant.id}"
+    else:
+        image_filename = product.image_file
+        variant_key = "main"
 
-    # 🗂️ Cache: اسم ملف ثابت لكل توليفة (منتج + نوع استخدام) لتفادي توليد نفس الصورة أكتر من مرة
+    image_path = os.path.join(UPLOAD_FOLDER, image_filename)
+
+    # 2. Check local disk cache (scoped per product + variant + usage)
     slug = slugify_usage(usage_type)
-    cache_filename = f"mockup_{product_id}_{slug}.png"
-    cache_full_path = os.path.join(UPLOAD_FOLDER, 'mockups', cache_filename)
+    cache_filename = f"mockup_p{product_id}_{variant_key}_{slug}.png"
+    cache_dir = os.path.join(UPLOAD_FOLDER, 'mockups')
+    os.makedirs(cache_dir, exist_ok=True)
+    cache_full_path = os.path.join(cache_dir, cache_filename)
 
     if os.path.exists(cache_full_path):
         return jsonify({
@@ -635,21 +675,97 @@ def preview_mockup():
             "cached": True
         })
 
-    mockup_relative_path = generate_fabric_mockup(
-        image_path=image_path,
-        usage_type=usage_type,
-        fabric_type=product.ai_fabric_type,
-        save_filename=cache_filename
+    # 3. Upload selected variant image to ImgBB
+    public_fabric_url = upload_local_image_to_public_url(image_path)
+    if not public_fabric_url:
+        return jsonify({"status": "error", "message": "تعذر رفع صورة النقشة للخادم السحابي"}), 500
+
+    # 4. Configure NanoBanana Image-to-Image Payload
+    prompt = (
+        f"Generate a professional, realistic product mockup of a {usage_type} "
+        f"crafted completely using the exact fabric texture, pattern, and color from the provided input image."
     )
 
-    if not mockup_relative_path:
-        return jsonify({
-            "status": "error",
-            "message": "تعذر توليد المعاينة حالياً، حاولي مرة تانية بعد شوي"
-        }), 500
+    headers = {
+        "Authorization": f"Bearer {NANOBANANA_API_KEY}",
+        "Content-Type": "application/json"
+    }
+    
+    payload = {
+        "prompt": prompt,
+        "type": "IMAGETOIAMGE",
+        "imageUrls": [public_fabric_url],
+        "numImages": 1,
+        "image_size": "1:1",
+        "callBackUrl": "https://localhost/dummy-callback"
+    }
 
-    return jsonify({
-        "status": "success",
-        "image_url": url_for('static', filename='uploads/' + mockup_relative_path),
-        "cached": False
-    })
+    try:
+        api_res = requests.post(
+            "https://api.nanobananaapi.ai/api/v1/nanobanana/generate",
+            json=payload,
+            headers=headers,
+            timeout=15
+        )
+        res_json = api_res.json()
+
+        if api_res.status_code == 200 and res_json.get("code") == 200:
+            task_id = res_json.get("data", {}).get("taskId")
+            return jsonify({
+                "status": "pending",
+                "task_id": task_id,
+                "product_id": product_id,
+                "variant_id": variant_id,
+                "usage_type": usage_type
+            })
+        else:
+            return jsonify({"status": "error", "message": res_json.get("msg", "فشل بدء التوليد")}), 500
+
+    except Exception as e:
+        return jsonify({"status": "error", "message": "تعذر الاتصال بخدمة التوليد"}), 500
+
+
+@inventory_bp.route('/product/mockup-status/<task_id>', methods=['GET'])
+def check_mockup_status(task_id):
+    product_id = request.args.get('product_id')
+    variant_id = request.args.get('variant_id', '')
+    usage_type = request.args.get('usage_type', '')
+
+    headers = {"Authorization": f"Bearer {NANOBANANA_API_KEY}"}
+    
+    try:
+        res = requests.get(
+            f"https://api.nanobananaapi.ai/api/v1/nanobanana/record-info?taskId={task_id}",
+            headers=headers,
+            timeout=10
+        )
+        data = res.json()
+
+        if data.get("code") == 200 and data.get("data"):
+            record = data["data"]
+            if record.get("successFlag") == 1:
+                result_url = record.get("response", {}).get("resultImageUrl")
+                
+                # Cache result locally once completed
+                if result_url and product_id and usage_type:
+                    variant_key = f"v{variant_id}" if variant_id else "main"
+                    slug = slugify_usage(usage_type)
+                    cache_filename = f"mockup_p{product_id}_{variant_key}_{slug}.png"
+                    cache_full_path = os.path.join(UPLOAD_FOLDER, 'mockups', cache_filename)
+
+                    img_data = requests.get(result_url).content
+                    with open(cache_full_path, 'wb') as f:
+                        f.write(img_data)
+
+                    local_url = url_for('static', filename='uploads/mockups/' + cache_filename)
+                    return jsonify({"status": "completed", "image_url": local_url})
+                
+                return jsonify({"status": "completed", "image_url": result_url})
+
+            elif record.get("errorCode") and record.get("errorCode") != 0:
+                return jsonify({"status": "failed", "message": record.get("errorMessage", "حدث خطأ أثناء المعالجة")})
+
+        return jsonify({"status": "processing"})
+
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
