@@ -55,7 +55,7 @@ class Product(db.Model):
     is_active = db.Column(db.Boolean, nullable=False, default=True)
     
     # ربط المنتج بالصنف الرئيسي
-    category_id = db.Column(db.Integer, db.ForeignKey('category.id'), nullable=True)
+    category_id = db.Column(db.Integer, db.ForeignKey('category.id'), nullable=False)
 
     # 🤖 حقول التحليل الذكي للأقمشة (AI Fabric Metrics)
     ai_fabric_type = db.Column(db.String(100), nullable=True)            # 1. نوع القماش المكتشف

@@ -62,7 +62,7 @@
                         
                         <!-- الحالة -->
                         <td class="text-end">
-                            <span class="badge {{ 'bg-success-subtle text-success' if order.status == 'dispatched' else 'bg-warning-subtle text-warning' }} rounded-pill">
+                            <span class="badge {{ 'bg-success-subtle text-success' if order.status == 'approved' else 'bg-warning-subtle text-warning' }} rounded-pill">
                                 {{ order.status|capitalize }}
                             </span>
                         </td>

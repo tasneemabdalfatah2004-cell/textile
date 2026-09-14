@@ -78,6 +78,7 @@
                             <i class="fas fa-magic"></i> Preview Look
                         </button>
                     </div>
+
                     <button class="btn btn-outline-success w-100 rounded-pill" onclick="openOrderModal('{{ product.id }}', '{{ product.name }}')">
                         <i class="fas fa-cart-plus"></i> Add To Cart
                     </button>
@@ -93,6 +94,7 @@
                         <h5 class="modal-title"><i class="fas fa-magic"></i> Preview: {{ product.name }}</h5>
                         <button type="button" class="close text-white" data-dismiss="modal">&times;</button>
                     </div>
+
                     <div class="modal-body text-center p-4">
                         <div class="form-group text-left mb-3">
                             <label class="font-weight-bold">اختر نوع الاستخدام:</label>
@@ -124,72 +126,215 @@
     </div>
 </div>
 
+
+<!-- =========================
+     CART MODAL
+     ========================= -->
+
 <div class="modal fade" id="cartModal" tabindex="-1" role="dialog" aria-hidden="true">
     <div class="modal-dialog modal-lg" role="document">
         <div class="modal-content" style="border-radius: 15px;">
+
             <div class="modal-header bg-success text-white">
-                <h5 class="modal-title"><i class="fas fa-shopping-cart"></i> Your Active Cart</h5>
+                <h5 class="modal-title">
+                    <i class="fas fa-shopping-cart"></i> Your Active Cart
+                </h5>
+
                 <button type="button" class="close text-white" data-dismiss="modal">&times;</button>
             </div>
+
             <div class="modal-body p-4">
+
                 {% if session.get('cart') %}
+
                 <table class="table align-middle text-center">
-                    <thead><tr><th>Fabric</th><th>Meters</th><th>Action</th></tr></thead>
-                    <tbody>
-                        {% for variant_id, qty in session.get('cart', {}).items() %}
+
+                    <thead>
                         <tr>
-                            <td>{{ session.get('variant_info_' + variant_id|string, 'Fabric Item') }}</td>
-                            <td class="font-weight-bold">{{ qty }}m</td>
+                            <th>Fabric</th>
+                            <th>Price / Meter</th>
+                            <th>Meters</th>
+                            <th>Total</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+
+                    <tbody>
+
+                        {% for item in cart_items %}
+
+                        <tr>
+
                             <td>
-                                <button type="button" class="btn btn-sm btn-outline-danger rounded-pill" onclick="removeItem('{{ variant_id }}')">
+                                {{ item.name }}
+                            </td>
+
+                            <td>
+                                ${{ "%.2f"|format(item.price_per_meter) }}
+                            </td>
+
+                            <td class="font-weight-bold">
+                                {{ "%.1f"|format(item.quantity) }}m
+                            </td>
+
+                            <td class="font-weight-bold text-success">
+                                ${{ "%.2f"|format(item.item_total) }}
+                            </td>
+
+                            <td>
+                                <button
+                                    type="button"
+                                    class="btn btn-sm btn-outline-danger rounded-pill"
+                                    onclick="removeItem('{{ item.variant_id }}')">
+
                                     <i class="fas fa-trash"></i>
+
                                 </button>
                             </td>
+
                         </tr>
+
                         {% endfor %}
+
                     </tbody>
+
+                    <tfoot>
+
+                        <tr>
+
+                            <td></td>
+
+                            <td></td>
+
+                            <td class="font-weight-bold">
+                                السعر الإجمالي
+                            </td>
+
+                            <td class="font-weight-bold text-success">
+                                ${{ "%.2f"|format(grand_total) }}
+                            </td>
+
+                            <td></td>
+
+                        </tr>
+
+                    </tfoot>
+
                 </table>
+
                 <form action="{{ url_for('inventory.cart_checkout') }}" method="POST" class="border-top pt-3">
-                    <input type="text" name="customer_name" class="form-control mb-3" placeholder="Enter Full Name To Confirm" required>
-                    <button type="submit" class="btn btn-success w-100 rounded-pill">Complete Order</button>
+
+                    <input
+                        type="text"
+                        name="customer_name"
+                        class="form-control mb-3"
+                        placeholder="Enter Full Name To Confirm"
+                        required>
+
+                    <button type="submit" class="btn btn-success w-100 rounded-pill">
+                        Complete Order
+                    </button>
+
                 </form>
+
                 {% else %}
-                <p class="text-center text-muted">Your cart is currently empty.</p>
+
+                <p class="text-center text-muted">
+                    Your cart is currently empty.
+                </p>
+
                 {% endif %}
+
             </div>
         </div>
     </div>
 </div>
+
+
+<!-- =========================
+     ORDER MODAL
+     ========================= -->
 
 <div class="modal fade" id="orderModal" tabindex="-1" role="dialog">
+
     <div class="modal-dialog modal-dialog-centered" role="document">
+
         <div class="modal-content">
+
             <div class="modal-header bg-success text-white">
-                <h5 class="modal-title" id="modal-product-name">Add to Cart</h5>
-                <button type="button" class="close text-white" data-dismiss="modal">&times;</button>
+
+                <h5 class="modal-title" id="modal-product-name">
+                    Add to Cart
+                </h5>
+
+                <button type="button" class="close text-white" data-dismiss="modal">
+                    &times;
+                </button>
+
             </div>
+
             <div class="modal-body">
+
                 <input type="hidden" id="hidden-variant-id">
+
                 <div class="mb-3">
-                    <label class="form-label">Color Profile</label>
-                    <input type="text" id="display-color-name" class="form-control bg-light" readonly>
+
+                    <label class="form-label">
+                        Color Profile
+                    </label>
+
+                    <input
+                        type="text"
+                        id="display-color-name"
+                        class="form-control bg-light"
+                        readonly>
+
                 </div>
+
                 <div class="mb-3">
-                    <label class="form-label">Quantity (Meters)</label>
-                    <input type="number" id="v-qty" step="0.1" class="form-control" required>
+
+                    <label class="form-label">
+                        Quantity (Meters)
+                    </label>
+
+                    <input
+                        type="number"
+                        id="v-qty"
+                        step="0.1"
+                        class="form-control"
+                        required>
+
                 </div>
+
             </div>
+
             <div class="modal-footer">
-                <button type="button" class="btn btn-success w-100" onclick="addToCartAjax()">Add To Active Session</button>
+
+                <button
+                    type="button"
+                    class="btn btn-success w-100"
+                    onclick="addToCartAjax()">
+
+                    Add To Active Session
+
+                </button>
+
             </div>
+
         </div>
+
     </div>
+
 </div>
 
+
 <script>
+
 function handleColorSelection(el, productId) {
+
     // Reset border for all variant circles of this specific product card
     $(`.pattern-circle-${productId}`).css('border-color', '#dee2e6');
+
     $(el).css('border-color', '#28a745');
 
     const variantId = $(el).data('variant-id');
@@ -203,221 +348,473 @@ function handleColorSelection(el, productId) {
     $('#display-color-name').val(variantName);
 }
 
+
 function openOrderModal(productId, productName) {
+
     const variantId = $(`#selected-variant-${productId}`).val();
+
     if (!variantId) {
-        Swal.fire('Warning', 'Please select a pattern/color first', 'warning');
+
+        Swal.fire(
+            'Warning',
+            'Please select a pattern/color first',
+            'warning'
+        );
+
         return;
     }
+
     $('#modal-product-name').text('Adding: ' + productName);
+
     $('#orderModal').modal('show');
 }
 
+
 function addToCartAjax() {
+
     const vId = $('#hidden-variant-id').val();
     const qty = $('#v-qty').val();
 
     if (!vId || !qty) {
-        Swal.fire('Error', 'Select pattern and quantity', 'error');
+
+        Swal.fire(
+            'Error',
+            'Select pattern and quantity',
+            'error'
+        );
+
         return;
     }
 
     $.ajax({
+
         url: '/cart/add',
+
         method: 'POST',
+
         data: {
             variant_id: vId,
             quantity: qty
         },
+
         success: function(response) {
+
             $('#orderModal').modal('hide');
+
             $('#v-qty').val('');
+
             Swal.fire({
+
                 title: 'Success',
+
                 text: 'Added to cart',
+
                 icon: 'success',
+
                 timer: 1500,
+
                 showConfirmButton: false
+
             }).then(() => {
-                location.reload(); 
+
+                location.reload();
+
             });
+
         },
+
         error: function(xhr) {
+
             let errorMessage = "Something went wrong";
+
             if (xhr.responseJSON && xhr.responseJSON.message) {
+
                 errorMessage = xhr.responseJSON.message;
+
             }
-            Swal.fire('Error', errorMessage, 'error');
+
+            Swal.fire(
+                'Error',
+                errorMessage,
+                'error'
+            );
+
         }
+
     });
+
 }
+
 
 function removeItem(variantId) {
+
     $.post('/cart/remove/' + variantId, function() {
-        window.location.href = window.location.pathname + '?cart_open=1';
+
+        window.location.href =
+            window.location.pathname + '?cart_open=1';
+
     });
+
 }
+
 
 function toggleCustomUsage(productId) {
-    const usageSelect = document.getElementById('mockup-usage-' + productId);
-    const customGroup = document.getElementById('custom-usage-group-' + productId);
+
+    const usageSelect =
+        document.getElementById('mockup-usage-' + productId);
+
+    const customGroup =
+        document.getElementById('custom-usage-group-' + productId);
 
     if (usageSelect && usageSelect.value === 'custom') {
+
         customGroup.style.display = 'block';
+
     } else {
+
         customGroup.style.display = 'none';
+
     }
+
 }
 
+
 // 🌟 AI Mockup Generation per Selected Variant 🌟
+
 function requestMockup(productId) {
-    const variantId = $(`#selected-variant-${productId}`).val();
+
+    const variantId =
+        $(`#selected-variant-${productId}`).val();
 
     if (!variantId) {
-        Swal.fire('تنبيه', 'يرجى اختيار النقشة/اللون بالضغط على إحدى الدوائر قبل المعاينة', 'warning');
+
+        Swal.fire(
+            'تنبيه',
+            'يرجى اختيار النقشة/اللون بالضغط على إحدى الدوائر قبل المعاينة',
+            'warning'
+        );
+
         return;
     }
 
-    const usageSelect = document.getElementById('mockup-usage-' + productId);
-    let selectedUsage = usageSelect ? usageSelect.value : '';
+    const usageSelect =
+        document.getElementById('mockup-usage-' + productId);
+
+    let selectedUsage =
+        usageSelect ? usageSelect.value : '';
 
     if (selectedUsage === 'custom') {
-        const customInput = document.getElementById('mockup-custom-input-' + productId);
-        selectedUsage = customInput ? customInput.value.trim() : '';
+
+        const customInput =
+            document.getElementById(
+                'mockup-custom-input-' + productId
+            );
+
+        selectedUsage =
+            customInput ? customInput.value.trim() : '';
+
     }
 
     if (!selectedUsage) {
-        Swal.fire('تنبيه', 'يرجى تحديد أو كتابة نوع الاستخدام', 'warning');
+
+        Swal.fire(
+            'تنبيه',
+            'يرجى تحديد أو كتابة نوع الاستخدام',
+            'warning'
+        );
+
         return;
     }
 
-    const resultBox = document.getElementById('mockup-result-' + productId);
+    const resultBox =
+        document.getElementById(
+            'mockup-result-' + productId
+        );
+
     resultBox.innerHTML = `
+
         <div class="text-muted py-3 text-center">
-            <div class="spinner-border text-primary mb-2" role="status"></div>
-            <p class="mb-0">عم يتولّد الشكل بناءً على النقشة المختارة... ⏳</p>
+
+            <div
+                class="spinner-border text-primary mb-2"
+                role="status">
+            </div>
+
+            <p class="mb-0">
+                عم يتولّد الشكل بناءً على النقشة المختارة... ⏳
+            </p>
+
         </div>
+
     `;
 
     $.ajax({
+
         url: '/product/preview-mockup',
+
         method: 'POST',
+
         data: {
+
             product_id: productId,
+
             variant_id: variantId,
+
             usage_type: selectedUsage
+
         },
+
         success: function(response) {
+
             if (response.status === 'success') {
-                renderMockupImage(resultBox, response.image_url);
-            } else if (response.status === 'pending' && response.task_id) {
-                pollMockupStatus(response.task_id, productId, variantId, selectedUsage, resultBox);
+
+                renderMockupImage(
+                    resultBox,
+                    response.image_url
+                );
+
+            } else if (
+                response.status === 'pending'
+                &&
+                response.task_id
+            ) {
+
+                pollMockupStatus(
+                    response.task_id,
+                    productId,
+                    variantId,
+                    selectedUsage,
+                    resultBox
+                );
+
             } else {
-                resultBox.innerHTML = `<p class="text-danger mb-0">${response.message || 'صار خطأ، حاولي مرة تانية'}</p>`;
+
+                resultBox.innerHTML =
+                    `<p class="text-danger mb-0">
+                        ${response.message || 'صار خطأ، حاولي مرة تانية'}
+                    </p>`;
+
             }
+
         },
+
         error: function(xhr) {
-            let msg = 'تعذر توليد المعاينة، حاولي مرة تانية بعد شوي';
-            if (xhr.responseJSON && xhr.responseJSON.message) {
+
+            let msg =
+                'تعذر توليد المعاينة، حاولي مرة تانية بعد شوي';
+
+            if (
+                xhr.responseJSON
+                &&
+                xhr.responseJSON.message
+            ) {
+
                 msg = xhr.responseJSON.message;
+
             }
-            resultBox.innerHTML = `<p class="text-danger mb-0">${msg}</p>`;
+
+            resultBox.innerHTML =
+                `<p class="text-danger mb-0">
+                    ${msg}
+                </p>`;
+
         }
+
     });
+
 }
 
-function pollMockupStatus(taskId, productId, variantId, usageType, resultBox) {
-    const pollInterval = setInterval(function() {
-        $.ajax({
-            url: `/product/mockup-status/${taskId}?product_id=${productId}&variant_id=${variantId}&usage_type=${encodeURIComponent(usageType)}`,
-            method: 'GET',
-            success: function(res) {
-                if (res.status === 'completed' && res.image_url) {
+
+function pollMockupStatus(
+    taskId,
+    productId,
+    variantId,
+    usageType,
+    resultBox
+) {
+
+    const pollInterval =
+        setInterval(function() {
+
+            $.ajax({
+
+                url:
+                    `/product/mockup-status/${taskId}?product_id=${productId}&variant_id=${variantId}&usage_type=${encodeURIComponent(usageType)}`,
+
+                method: 'GET',
+
+                success: function(res) {
+
+                    if (
+                        res.status === 'completed'
+                        &&
+                        res.image_url
+                    ) {
+
+                        clearInterval(pollInterval);
+
+                        renderMockupImage(
+                            resultBox,
+                            res.image_url
+                        );
+
+                    } else if (res.status === 'failed') {
+
+                        clearInterval(pollInterval);
+
+                        resultBox.innerHTML =
+                            `<p class="text-danger mb-0">
+                                ${res.message || 'فشل توليد المعاينة'}
+                            </p>`;
+
+                    }
+
+                },
+
+                error: function() {
+
                     clearInterval(pollInterval);
-                    renderMockupImage(resultBox, res.image_url);
-                } else if (res.status === 'failed') {
-                    clearInterval(pollInterval);
-                    resultBox.innerHTML = `<p class="text-danger mb-0">${res.message || 'فشل توليد المعاينة'}</p>`;
+
+                    resultBox.innerHTML =
+                        `<p class="text-danger mb-0">
+                            حدث خطأ أثناء متابعة التوليد
+                        </p>`;
+
                 }
-            },
-            error: function() {
-                clearInterval(pollInterval);
-                resultBox.innerHTML = `<p class="text-danger mb-0">حدث خطأ أثناء متابعة التوليد</p>`;
-            }
-        });
-    }, 3000);
+
+            });
+
+        }, 3000);
+
 }
+
 
 function renderMockupImage(container, imageUrl) {
-    container.innerHTML = `<img src="${imageUrl}" class="img-fluid rounded shadow-sm" style="max-height: 350px; object-fit: cover;">`;
+
+    container.innerHTML =
+        `<img
+            src="${imageUrl}"
+            class="img-fluid rounded shadow-sm"
+            style="max-height: 350px; object-fit: cover;">`;
+
 }
+
 
 document.addEventListener('DOMContentLoaded', function() {
 
     $('.filter-btn').click(function(){
-        const targetFilter = $(this).data('filter').toString();
+
+        const targetFilter =
+            $(this).data('filter').toString();
 
         $('.filter-btn').removeClass('active');
+
         $(this).addClass('active');
 
         $('#fabricSearch').val('');
 
         $('.fabric-item').each(function() {
-            const itemCategory = $(this).data('category').toString();
-            if (targetFilter === 'all' || itemCategory === targetFilter) {
+
+            const itemCategory =
+                $(this).data('category').toString();
+
+            if (
+                targetFilter === 'all'
+                ||
+                itemCategory === targetFilter
+            ) {
+
                 $(this).fadeIn(300);
+
             } else {
+
                 $(this).fadeOut(300);
+
             }
+
         });
+
     });
 
-    const urlParams = new URLSearchParams(window.location.search);
+
+    const urlParams =
+        new URLSearchParams(window.location.search);
+
     if (urlParams.has('cart_open')) {
+
         $('#cartModal').modal('show');
+
     }
 
+
     $('#fabricSearch').on('keyup', function() {
-        var value = $(this).val().toLowerCase().trim();
+
+        var value =
+            $(this).val().toLowerCase().trim();
+
         $('.filter-btn').removeClass('active');
+
         $('.filter-btn[data-filter="all"]').addClass('active');
 
         $('.fabric-item').each(function() {
-            var productName = $(this).data('name');
-            if (value === "" || productName.includes(value)) {
+
+            var productName =
+                $(this).data('name');
+
+            if (
+                value === ""
+                ||
+                productName.includes(value)
+            ) {
+
                 $(this).show();
+
             } else {
+
                 $(this).hide();
+
             }
+
         });
+
     });
 
 });
+
 </script>
 
+
 <style>
+
     .fabric-item .card {
         display: flex;
         flex-direction: column;
     }
+
     .fabric-item .card-body {
         display: flex;
         flex-direction: column;
         flex-grow: 1;
     }
+
     .fabric-item .card-body p {
         flex-grow: 1;
     }
+
     .fabric-item .card-body > button:last-child {
         margin-top: auto;
     }
+
     #fabricSearch:focus {
         border-color: #28a745;
         box-shadow: 0 0 5px rgba(40, 167, 69, 0.5);
     }
+
     .filter-btn.active {
         background-color: #28a745 !important;
         color: white !important;
     }
+
 </style>
+
 {% endblock %}

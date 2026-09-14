@@ -119,9 +119,10 @@
                                 <img src="{{ url_for('static', filename='uploads/' + (variant.image_filename or 'default.jpg')) }}"
                                      class="card-img-top" style="height: 160px; object-fit: cover;">
                                 <div class="card-footer p-2">
-                                    <p class="text-muted small mb-1">{{ variant.color_name }}</p>
+                                    <label class="text-muted text-xs mb-1">اسم الديزان</label>
+                                    <input type="text" name="name_variant_{{ variant.id }}" value="{{ variant.color_name }}" class="form-control form-control-sm mb-2">
                                     <label class="text-muted text-xs mb-1">الكمية بالمتر</label>
-                                    <input type="number" name="qty_variant_{{ variant.id }}" value="{{ variant.quantity }}" class="form-control form-control-sm">
+                                    <input type="number" step="0.1" name="qty_variant_{{ variant.id }}" value="{{ variant.quantity }}" class="form-control form-control-sm">
                                 </div>
                             </div>
                         </div>
@@ -130,35 +131,77 @@
                 </div>
             </div>
 
-            <!-- Add New Design -->
+            <!-- Add New Designs -->
             <div class="card card-outline card-warning shadow-sm">
-                <div class="card-header">
-                    <h3 class="card-title"><i class="fas fa-plus-circle mr-1 text-warning"></i> إضافة ديزان جديد للقماش</h3>
+                <div class="card-header d-flex align-items-center">
+                    <h3 class="card-title mb-0">
+                        <i class="fas fa-plus-circle mr-1 text-warning"></i>
+                        إضافة ديزانات جديدة للقماش
+                    </h3>
                 </div>
+
                 <div class="card-body">
-                    <div class="row align-items-end">
-                        <div class="col-md-3">
-                            <div class="form-group">
-                                <label class="text-muted text-sm">اسم الديزان</label>
-                                <input type="text" name="new_variant_name" class="form-control" placeholder="مثال: أزهار حرير">
-                            </div>
-                        </div>
-                        <div class="col-md-6">
-                            <div class="form-group">
-                                <label class="text-muted text-sm">صورة الديزان</label>
-                                <div class="custom-file">
-                                    <input type="file" name="new_variant_image" class="custom-file-input" id="new_variant_image">
-                                    <label class="custom-file-label" for="new_variant_image">اختاري صورة...</label>
+                    <div id="new-variant-entries-container">
+
+                        <!-- أول صف -->
+                        <div class="row new-variant-row border rounded p-2 mb-3 align-items-end">
+                            <div class="col-md-3">
+                                <div class="form-group mb-0">
+                                    <label class="text-muted text-sm">اسم الديزان</label>
+                                    <input type="text"
+                                           name="new_variant_names[]"
+                                           class="form-control"
+                                           placeholder="مثال: أزهار حرير">
                                 </div>
                             </div>
-                        </div>
-                        <div class="col-md-3">
-                            <div class="form-group">
-                                <label class="text-muted text-sm">الكمية الابتدائية</label>
-                                <input type="number" name="new_variant_qty" class="form-control" placeholder="0.0">
+
+                            <div class="col-md-5">
+                                <div class="form-group mb-0">
+                                    <label class="text-muted text-sm">صورة الديزان</label>
+                                    <input type="file"
+                                           name="new_variant_images[]"
+                                           class="form-control"
+                                           accept="image/*"
+                                           onchange="previewNewVariantImage(this)">
+                                    <img class="new-variant-preview mt-2"
+                                         style="width:55px; height:55px; object-fit:cover; display:none; border-radius:50%; border:1px solid #ccc;">
+                                </div>
+                            </div>
+
+                            <div class="col-md-3">
+                                <div class="form-group mb-0">
+                                    <label class="text-muted text-sm">الكمية الابتدائية</label>
+                                    <input type="number"
+                                           step="0.1"
+                                           min="0"
+                                           name="new_variant_quantities[]"
+                                           class="form-control"
+                                           placeholder="0.0">
+                                </div>
+                            </div>
+
+                            <div class="col-md-1 d-flex align-items-end">
+                                <button type="button"
+                                        class="btn btn-danger btn-block"
+                                        onclick="removeNewVariantRow(this)"
+                                        title="حذف الصف">
+                                    <i class="fas fa-minus"></i>
+                                </button>
                             </div>
                         </div>
+
                     </div>
+
+                    <button type="button"
+                            class="btn btn-warning"
+                            onclick="addNewVariantRow()">
+                        <i class="fas fa-plus mr-1"></i>
+                        إضافة ديزان آخر
+                    </button>
+
+                    <small class="text-muted d-block mt-2">
+                        يمكنك إضافة أكثر من ديزان، ثم حفظهم جميعاً بضغطة واحدة على زر "حفظ التعديلات".
+                    </small>
                 </div>
             </div>
 
@@ -234,5 +277,96 @@ $(document).ready(function() {
         $(this).siblings('.custom-file-label').addClass('selected').html(fileName || 'اختاري صورة...');
     });
 });
+
+function addNewVariantRow() {
+    const container = document.getElementById('new-variant-entries-container');
+    const row = document.createElement('div');
+
+    row.className = 'row new-variant-row border rounded p-2 mb-3 align-items-end';
+
+    row.innerHTML = `
+        <div class="col-md-3">
+            <div class="form-group mb-0">
+                <label class="text-muted text-sm">اسم الديزان</label>
+                <input type="text"
+                       name="new_variant_names[]"
+                       class="form-control"
+                       placeholder="مثال: أزهار حرير">
+            </div>
+        </div>
+
+        <div class="col-md-5">
+            <div class="form-group mb-0">
+                <label class="text-muted text-sm">صورة الديزان</label>
+                <input type="file"
+                       name="new_variant_images[]"
+                       class="form-control"
+                       accept="image/*"
+                       onchange="previewNewVariantImage(this)">
+                <img class="new-variant-preview mt-2"
+                     style="width:55px; height:55px; object-fit:cover; display:none; border-radius:50%; border:1px solid #ccc;">
+            </div>
+        </div>
+
+        <div class="col-md-3">
+            <div class="form-group mb-0">
+                <label class="text-muted text-sm">الكمية الابتدائية</label>
+                <input type="number"
+                       step="0.1"
+                       min="0"
+                       name="new_variant_quantities[]"
+                       class="form-control"
+                       placeholder="0.0">
+            </div>
+        </div>
+
+        <div class="col-md-1 d-flex align-items-end">
+            <button type="button"
+                    class="btn btn-danger btn-block"
+                    onclick="removeNewVariantRow(this)"
+                    title="حذف الصف">
+                <i class="fas fa-minus"></i>
+            </button>
+        </div>
+    `;
+
+    container.appendChild(row);
+}
+
+function removeNewVariantRow(button) {
+    const container = document.getElementById('new-variant-entries-container');
+    const rows = container.querySelectorAll('.new-variant-row');
+
+    // نخلي صف واحد على الأقل ظاهر بدل ما يختفي القسم كله
+    if (rows.length === 1) {
+        const row = rows[0];
+        row.querySelectorAll('input').forEach(input => {
+            input.value = '';
+        });
+
+        const preview = row.querySelector('.new-variant-preview');
+        if (preview) {
+            preview.src = '';
+            preview.style.display = 'none';
+        }
+        return;
+    }
+
+    button.closest('.new-variant-row').remove();
+}
+
+function previewNewVariantImage(input) {
+    if (input.files && input.files[0]) {
+        const reader = new FileReader();
+
+        reader.onload = function(e) {
+            const preview = input.parentElement.querySelector('.new-variant-preview');
+            preview.src = e.target.result;
+            preview.style.display = 'block';
+        };
+
+        reader.readAsDataURL(input.files[0]);
+    }
+}
 </script>
 {% endblock %}

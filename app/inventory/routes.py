@@ -8,10 +8,10 @@ from flask_login import login_required, current_user
 from sqlalchemy import func
 from flask import request 
 from app.ai_service import analyze_fabric_image
-from app.ai_mockup_service import generate_fabric_mockup, slugify_usage
 from sqlalchemy.orm import joinedload 
 from datetime import datetime 
 from app import db
+from flask import send_from_directory, abort
 from app.models import User, Product, ProductVariant, Order, OrderItem, Customer, SupplyLog ,Category
 from werkzeug.utils import secure_filename
 # تم تصحيح البلوبرينت ليعمل بسلاسة
@@ -34,17 +34,70 @@ COLOR_MAP = {
 }
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+USAGE_SLUG_MAX_LEN = 40
+
+
+def slugify_usage(usage_type):
+    """
+    يحول نص الاستخدام (عربي عادة) إلى اسم ملف آمن (slug) عشان نستخدمه
+    بتسمية صورة المعاينة المخزّنة (cache) بدل توليدها من جديد كل مرة.
+    """
+    safe_chars = []
+    for ch in usage_type.strip():
+        if ch.isalnum():
+            safe_chars.append(ch)
+        elif ch in (' ', '-', '_'):
+            safe_chars.append('_')
+    slug = ''.join(safe_chars) or 'usage'
+    return slug[:USAGE_SLUG_MAX_LEN]
 # =========================
 # SHOP (CUSTOMER VIEW)
-# =========================
+# SHOP (CUSTOMER VIEW)
 @inventory_bp.route('/')
 @inventory_bp.route('/shop')
 def customer_shop():
-    # الفلتر هنا يضمن أن الأقمشة المؤرشفة (is_active=False) لا تظهر للزبون
     products = Product.query.filter_by(is_active=True).all()
     categories = Category.query.all()
     cart = session.get('cart', {})
-    return render_template('inventory/shop.html', products=products, categories=categories, cart=cart)
+
+    cart_items = []
+    grand_total = 0.0
+
+    for variant_id_str, qty in cart.items():
+
+        variant = ProductVariant.query.get(int(variant_id_str))
+
+        if not variant:
+            continue
+
+        quantity = float(qty)
+        price_per_meter = float(variant.product.selling_price or 0)
+
+        item_total = quantity * price_per_meter
+
+        grand_total += item_total
+
+        cart_items.append({
+            'variant_id': variant.id,
+            'name': session.get(
+                'variant_info_' + str(variant_id_str),
+                f"{variant.product.name} - {variant.color_name}"
+            ),
+            'quantity': quantity,
+            'price_per_meter': price_per_meter,
+            'item_total': item_total
+        })
+
+    return render_template(
+        'inventory/shop.html',
+        products=products,
+        categories=categories,
+        cart=cart,
+        cart_items=cart_items,
+        grand_total=grand_total
+    )
+ 
 # =========================
 # ADD TO CART
 # =========================
@@ -191,14 +244,16 @@ def add_product():
         product = Product.query.filter(Product.name.ilike(product_name)).first()
 
         category_id = request.form.get('category_id')
-        chosen_category_id = int(category_id) if category_id else None
+        if not category_id:
+            flash('يجب اختيار صنف للقماش قبل الحفظ.', 'danger')
+            return redirect(url_for('inventory.add_product'))
+        chosen_category_id = int(category_id)
 
         if product:
             product.description = request.form.get('description')
             product.selling_price = float(request.form.get('selling_price', 0))
             product.cost_price_per_meter = float(request.form.get('cost_price_per_meter', 0))
-            if chosen_category_id:
-                product.category_id = chosen_category_id
+            product.category_id = chosen_category_id
         else:
             product = Product(
                 name=product_name,
@@ -297,67 +352,229 @@ def add_product():
 # =========================
 # EDIT PRODUCT (MODIFIED FOR IMAGE DESIGNS & CATEGORIES)
 # =========================
-from sqlalchemy.orm import joinedload
-
+# =========================
+# EDIT PRODUCT
+# =========================
 @inventory_bp.route('/product/edit/<int:id>', methods=['GET', 'POST'])
 @login_required
 def edit_product(id):
-    product = Product.query.options(joinedload(Product.variants)).get_or_404(id)
+    product = Product.query.options(
+        joinedload(Product.variants)
+    ).get_or_404(id)
 
     if request.method == 'POST':
-        product.cost_price_per_meter = float(request.form.get('cost_price_per_meter') or 0)
-        product.selling_price = float(request.form.get('selling_price') or 0)
-        
-        category_id = request.form.get('category_id')
-        product.category_id = int(category_id) if category_id else None
 
-        # 🌟 استبدال الصورة الرئيسية بالمتجر (منفصلة عن صورة التحليل) 🌟
+        # =========================
+        # BASIC PRODUCT INFORMATION
+        # =========================
+        product.cost_price_per_meter = float(
+            request.form.get('cost_price_per_meter') or 0
+        )
+
+        product.selling_price = float(
+            request.form.get('selling_price') or 0
+        )
+
+        # =========================
+        # CATEGORY
+        # =========================
+        category_id = request.form.get('category_id')
+
+        if not category_id:
+            flash('يجب اختيار صنف للقماش قبل الحفظ.', 'danger')
+            return redirect(
+                url_for('inventory.edit_product', id=product.id)
+            )
+
+        product.category_id = int(category_id)
+
+        # =========================
+        # MAIN DISPLAY IMAGE
+        # =========================
         if 'main_display_image' in request.files:
+
             main_image = request.files['main_display_image']
-            if main_image and main_image.filename and allowed_file(main_image.filename):
+
+            if (
+                main_image
+                and main_image.filename
+                and allowed_file(main_image.filename)
+            ):
+
                 main_filename = secure_filename(main_image.filename)
                 main_filename = f"main_{product.id}_{main_filename}"
-                main_image.save(os.path.join(UPLOAD_FOLDER, main_filename))
+
+                main_image.save(
+                    os.path.join(
+                        UPLOAD_FOLDER,
+                        main_filename
+                    )
+                )
+
                 product.image_file = main_filename
 
+        # =========================
+        # UPDATE EXISTING DESIGNS
+        # =========================
         for variant in product.variants:
-            qty_input = request.form.get(f'qty_variant_{variant.id}')
+
+            # تعديل اسم الديزان
+            name_input = request.form.get(
+                f'name_variant_{variant.id}'
+            )
+
+            if name_input is not None:
+                name_input = name_input.strip()
+
+                if name_input:
+                    variant.color_name = name_input
+
+            # تعديل الكمية
+            qty_input = request.form.get(
+                f'qty_variant_{variant.id}'
+            )
+
             if qty_input is not None:
-                variant.quantity = float(qty_input)
+                try:
+                    variant.quantity = float(qty_input or 0)
+                except ValueError:
+                    variant.quantity = 0
 
-        if 'new_variant_image' in request.files:
-            file = request.files['new_variant_image']
-            if file and file.filename and allowed_file(file.filename):
-                filename = secure_filename(file.filename)
-                file.save(os.path.join(UPLOAD_FOLDER, filename))
-                design_name = request.form.get('new_variant_name') or "unnamed design"
-                
-                new_variant = ProductVariant(
-                    product_id=product.id,
-                    color_name=design_name, 
-                    image_filename=filename,
-                    quantity=float(request.form.get('new_variant_qty') or 0)
-                )
-                db.session.add(new_variant)
+        # =========================
+        # ADD MULTIPLE NEW DESIGNS
+        # =========================
+        new_variant_names = request.form.getlist(
+            'new_variant_names[]'
+        )
 
-        # 🌟 إضافة سجل مصدر/مورد جديد (اختياري) 🌟
+        new_variant_quantities = request.form.getlist(
+            'new_variant_quantities[]'
+        )
+
+        new_variant_images = request.files.getlist(
+            'new_variant_images[]'
+        )
+
+        # نمر على كل الصفوف الجديدة
+        for index, design_name in enumerate(new_variant_names):
+
+            design_name = design_name.strip()
+
+            # إذا الاسم فارغ نتجاهل الصف
+            if not design_name:
+                continue
+
+            # =========================
+            # QUANTITY
+            # =========================
+            quantity = 0
+
+            if index < len(new_variant_quantities):
+                try:
+                    quantity = float(
+                        new_variant_quantities[index] or 0
+                    )
+                except ValueError:
+                    quantity = 0
+
+            # =========================
+            # IMAGE
+            # =========================
+            image_filename = None
+
+            if index < len(new_variant_images):
+
+                image_file = new_variant_images[index]
+
+                if (
+                    image_file
+                    and image_file.filename
+                    and allowed_file(image_file.filename)
+                ):
+
+                    original_filename = secure_filename(
+                        image_file.filename
+                    )
+
+                    image_filename = (
+                        f"variant_{product.id}_"
+                        f"{index}_{original_filename}"
+                    )
+
+                    image_file.save(
+                        os.path.join(
+                            UPLOAD_FOLDER,
+                            image_filename
+                        )
+                    )
+
+            # =========================
+            # CREATE NEW VARIANT
+            # =========================
+            new_variant = ProductVariant(
+                product_id=product.id,
+                color_name=design_name,
+                quantity=quantity,
+                image_filename=image_filename
+            )
+
+            db.session.add(new_variant)
+
+        # =========================
+        # ADD SUPPLIER / SOURCE LOG
+        # =========================
         partner_name = request.form.get('partner_name')
-        if partner_name:
+
+        if partner_name and partner_name.strip():
+
+            try:
+                source_quantity = float(
+                    request.form.get('source_quantity') or 0
+                )
+            except ValueError:
+                source_quantity = 0
+
+            try:
+                source_cost_price = float(
+                    request.form.get('source_cost_price') or 0
+                )
+            except ValueError:
+                source_cost_price = 0
+
             supply = SupplyLog(
                 product_id=product.id,
-                partner_name=partner_name,
-                supplied_quantity=float(request.form.get('source_quantity') or 0),
-                cost_price_at_purchase=float(request.form.get('source_cost_price') or 0),
+                partner_name=partner_name.strip(),
+                supplied_quantity=source_quantity,
+                cost_price_at_purchase=source_cost_price,
                 notes=request.form.get('source_notes')
             )
+
             db.session.add(supply)
 
+        # =========================
+        # SAVE EVERYTHING
+        # =========================
         db.session.commit()
-        flash("Product and design specifications updated successfully", "success")
-        return redirect(url_for('inventory.list_products'))
 
+        flash(
+            "تم تحديث القماش وإضافة الديزانات بنجاح",
+            "success"
+        )
+
+        return redirect(
+            url_for('inventory.list_products')
+        )
+
+    # =========================
+    # GET
+    # =========================
     categories = Category.query.all()
-    return render_template('inventory/edit_product.html', product=product, categories=categories)
+
+    return render_template(
+        'inventory/edit_product.html',
+        product=product,
+        categories=categories
+    )
 # =========================
 # AI REPORT VIEW (SAVED PRODUCT)
 # =========================
@@ -416,13 +633,13 @@ def list_sources():
     all_supplies = SupplyLog.query.order_by(SupplyLog.purchase_date.desc()).all()
     return render_template('inventory/list_sources.html', supplies=all_supplies)
 #================    
-@inventory_bp.route('/product/customs/<filename>')
+@inventory_bp.route('/product/customs/<int:product_id>')
 @login_required
-def view_customs(filename):
-    try:
-        return send_from_directory(uploads, filename)
-    except FileNotFoundError:
-        abort(404, description="Customs document file not found on core storage.")    
+def view_customs(product_id):
+    product = Product.query.get_or_404(product_id)
+    if not product.customs_file:
+        abort(404, description="No customs document for this product.")
+    return send_from_directory(UPLOAD_FOLDER, product.customs_file)
 @inventory_bp.route('/product/search')
 @login_required
 def search_products():
@@ -462,6 +679,7 @@ def financial_report():
                            total_revenue=total_revenue)
 
 @inventory_bp.route('/fix-database')
+@login_required
 def fix_database():
     from app.models import Order
     orphaned_orders = Order.query.filter(Order.customer_id == None).all()
@@ -526,14 +744,14 @@ def save_product():
         name = request.form.get('name')
         image_name = request.form.get('image_name') or 'default.jpg'
         ai_analysis_json = request.form.get('ai_analysis_json')
-        
+
         analysis_data = {}
         if ai_analysis_json:
             try:
                 analysis_data = json.loads(ai_analysis_json)
             except:
                 analysis_data = {}
-        
+
         if analysis_data is None:
             analysis_data = {}
 
@@ -559,23 +777,32 @@ def save_product():
             ai_overall_quality_index=analysis_data.get('overall_quality_index', 100),
             ai_estimated_price_per_meter=analysis_data.get('estimated_price_per_meter')
         )
-        
+
         db.session.add(new_product)
+        db.session.flush()  # للحصول على new_product.id قبل الكوميت
+
+        # 🌟 إنشاء أول ديزان (Variant) تلقائيًا من نفس صورة التحليل
+        # منشان المستخدم ما يضطر يرفعها من جديد بصفحة التعديل
+        first_variant_name = analysis_data.get('pattern_style') or 'التصميم الأساسي'
+        first_variant = ProductVariant(
+            product_id=new_product.id,
+            color_name=first_variant_name,
+            image_filename=image_name,
+            quantity=0
+        )
+        db.session.add(first_variant)
+
         db.session.commit()
-        
+
         flash('تم حفظ القماش كمسودة 📋 — أكملي السعر والكمية والصنف، ثم فعّليه ليظهر عند الزبون.', 'success')
         return redirect(url_for('inventory.edit_product', id=new_product.id))
-        
+
     except Exception as e:
         db.session.rollback()
-        print(f"Error detail: {e}") 
+        print(f"Error detail: {e}")
         flash(f'حدث خطأ أثناء حفظ المنتج: {str(e)}', 'danger')
         return redirect(url_for('inventory.analyze'))
-#-----------------------
-@inventory_bp.route('/products')
-def list_product():
-    products = Product.query.all()
-    return render_template('inventory/products_list.html', products=products)        
+       
 # ==========================================
 # MANAGEMENT OF CATEGORIES
 # ==========================================
